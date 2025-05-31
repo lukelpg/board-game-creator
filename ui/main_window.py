@@ -7,6 +7,7 @@ from game import Card, Piece, Deck, Board, Player, GameEngine
 from .card_editor  import CardEditor
 from .piece_editor import PieceEditor
 from .board_view   import BoardView
+from .catalog_view import CatalogViewer
 
 CARD_DB  = "cards.json"
 PIECE_DB = "pieces.json"
@@ -46,8 +47,9 @@ def run_app(data: pathlib.Path, imgs: pathlib.Path):
         piece_lb.delete(0,"end");[piece_lb.insert("end", p.name) for p in pieces]
     _refresh()
 
-    ttk.Button(sidebar, text="Shuffle Deck", command=lambda:(deck.shuffle(),
-              messagebox.showinfo("Deck","Deck shuffled"))).pack(pady=4, fill="x")
+    ttk.Button(sidebar, text="Open Catalog",
+            command=lambda: CatalogViewer(root, cards, pieces, imgs))\
+            .pack(pady=(2,4), fill="x")
 
     # ---------- board centre --------------------------------------------- #
     centre = ttk.Frame(root, padding=6); centre.grid(row=0,column=1)
