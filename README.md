@@ -8,7 +8,7 @@ Features
 * Drag cards into decks and onto an 8 × 8 board
 * Multiple players with turn order
 * Data saved as JSON (no database required)
-* Pure-Python GUI via [PySimpleGUI](https://pysimplegui.readthedocs.io/)
+* Pure-Python GUI via Tkinter (built-in)
 
 ## Quick start
 ```bash

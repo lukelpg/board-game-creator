@@ -1,76 +1,73 @@
 from __future__ import annotations
-import PySimpleGUI as sg
+import tkinter as tk
+from tkinter import ttk, messagebox
 import json, pathlib
 from typing import List
 from game import Card, Deck, Board, Player, GameEngine
 from .card_editor import CardEditor
-from .board_view import BoardView
+from .board_view  import BoardView
 
 CARD_DB = "cards.json"
 
-# ---------- helpers -------------------------------------------------------
+# -------------------------------------------------------------------- #
 def load_cards(data_dir: pathlib.Path) -> List[Card]:
-    path = data_dir / CARD_DB
-    return [] if not path.exists() else [Card.from_dict(d) for d in json.loads(path.read_text())]
+    p = data_dir / CARD_DB
+    return [] if not p.exists() else [Card.from_dict(d) for d in json.loads(p.read_text())]
 
 def save_cards(data_dir: pathlib.Path, cards: List[Card]):
     (data_dir / CARD_DB).write_text(json.dumps([c.to_dict() for c in cards], indent=2))
 
-# ---------- main window ---------------------------------------------------
+# -------------------------------------------------------------------- #
 def run_app(data_dir: pathlib.Path, images_dir: pathlib.Path):
-    sg.theme("SystemDefault")
+    root = tk.Tk()
+    root.title("Card & Board Game")
 
-    cards = load_cards(data_dir)
-    deck  = Deck("Main", cards.copy())
+    cards: List[Card] = load_cards(data_dir)
+    deck = Deck("Main", cards.copy())
     board = Board()
     players = [Player("Player 1"), Player("Player 2")]
     engine  = GameEngine(players, deck, board)
 
-    list_key = "-CARDLIST-"
+    # ---------- left pane (card list) ---------------------------------- #
+    left = ttk.Frame(root, padding=6)
+    left.grid(row=0, column=0, sticky="ns")
+
+    ttk.Label(left, text="Cards").pack(anchor="w")
+    listbox = tk.Listbox(left, height=12, width=20)
+    listbox.pack(fill="y", expand=True)
 
     def refresh():
-        window[list_key].update(values=[c.name for c in cards])
+        listbox.delete(0, "end")
+        for c in cards:
+            listbox.insert("end", c.name)
+    refresh()
 
-    # callback from editor
-    def on_card_saved(card: Card):
-        cards.append(card)
-        save_cards(data_dir, cards)
-        refresh()
+    def shuffle():
+        deck.shuffle()
+        messagebox.showinfo("Deck", "Deck shuffled")
+    ttk.Button(left, text="Shuffle Deck", command=shuffle).pack(pady=4)
 
-    card_editor = CardEditor(images_dir, on_card_saved)
-    board_view  = BoardView(board, lambda *a: None)
+    # ---------- center (board) ----------------------------------------- #
+    center = ttk.Frame(root, padding=6)
+    center.grid(row=0, column=1)
+    board_view = BoardView(center, board, lambda *a: None)
+    board_view.pack()
 
-    layout = [
-        [
-            sg.Column([
-                [sg.Text("Cards")],
-                [sg.Listbox([c.name for c in cards], size=(20,12), key=list_key)],
-                [sg.Button("Shuffle Deck", key="-SHUFFLE-")],
-            ]),
-            sg.VSeperator(),
-            sg.Column([[board_view.layout()]]),
-            sg.VSeperator(),
-            sg.Column([[card_editor.layout()]]),
-        ]
-    ]
+    # ---------- right pane (editor) ------------------------------------ #
+    right = CardEditor(root, images_dir, on_save=lambda c: (cards.append(c),
+                                                           save_cards(data_dir, cards),
+                                                           refresh()))
+    right.grid(row=0, column=2, sticky="n")
 
-    window = sg.Window("Card & Board Game", layout, finalize=True)
-    selected: Card | None = None
+    # share selected card with board_view
+    root.selected_card: Card | None = None
+    def on_select(evt):
+        idxs = listbox.curselection()
+        root.selected_card = cards[idxs[0]] if idxs else None
+    listbox.bind("<<ListboxSelect>>", on_select)
 
-    while True:
-        event, values = window.read()
-        if event == sg.WINDOW_CLOSED:
-            break
+    # grid weights
+    root.columnconfigure(1, weight=1)
+    root.rowconfigure(0, weight=1)
 
-        if event == "-SHUFFLE-":
-            deck.shuffle()
-            sg.popup("Deck shuffled")
-
-        if event == list_key and values[list_key]:
-            idx = window[list_key].curselection[0]
-            selected = cards[idx]
-
-        board_view.read_event(event, values, selected)
-        card_editor.read_event(event, values)
-
-    window.close()
+    root.mainloop()

@@ -1,64 +1,86 @@
 from __future__ import annotations
-import PySimpleGUI as sg
-import pathlib
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+import pathlib, shutil
 from typing import Callable, Optional
 from game.card import Card
 
-class CardEditor:
-    """Widget for creating/editing cards."""
+class CardEditor(ttk.Frame):
+    """Right-hand pane for creating/editing cards."""
 
-    def __init__(self, images_dir: pathlib.Path, on_save: Callable[[Card], None]):
+    def __init__(self, master, images_dir: pathlib.Path,
+                 on_save: Callable[[Card], None]):
+        super().__init__(master, padding=6)
         self.images_dir = images_dir
         self.on_save = on_save
-        self.card: Optional[Card] = None
-        self._build_layout()
+        self._build_widgets()
 
-    # ---------------- public API -----------------------------------------
-    def layout(self):
-        return self.column
+    # ------------------------------------------------------------------ #
+    def _build_widgets(self):
+        self.columnconfigure(1, weight=1)
 
-    # ---------------- internals ------------------------------------------
-    def _build_layout(self):
-        self.name_key = "-NAME-"
-        self.desc_key = "-DESC-"
-        self.img_key  = "-IMG-"
-        self.atk_key  = "-ATK-"
-        self.def_key  = "-DEF-"
-        self.save_key = "-SAVE-"
+        ttk.Label(self, text="Name").grid(row=0, column=0, sticky="w")
+        self.name = ttk.Entry(self)
+        self.name.grid(row=0, column=1, sticky="ew")
 
-        self.column = sg.Column([
-            [sg.Text("Name"), sg.Input(key=self.name_key)],
-            [sg.Text("Description"), sg.Multiline(size=(30,4), key=self.desc_key)],
-            [sg.Text("Image"), sg.Input(key=self.img_key, enable_events=True), sg.FileBrowse()],
-            [sg.Text("Attack"), sg.Input(size=(5,1), key=self.atk_key),
-             sg.Text("Defense"), sg.Input(size=(5,1), key=self.def_key)],
-            [sg.Button("Save", key=self.save_key)],
-        ])
+        ttk.Label(self, text="Description").grid(row=1, column=0, sticky="nw")
+        self.desc = tk.Text(self, width=28, height=4)
+        self.desc.grid(row=1, column=1, sticky="ew")
 
-    def read_event(self, event, values):
-        if event == self.save_key:
-            self._save(values)
-        elif event == self.img_key and values[self.img_key]:
-            self._copy_image(values[self.img_key])
+        ttk.Label(self, text="Image").grid(row=2, column=0, sticky="w")
+        img_frame = ttk.Frame(self)
+        img_frame.grid(row=2, column=1, sticky="ew")
+        self.img_path = tk.StringVar()
+        ttk.Entry(img_frame, textvariable=self.img_path).pack(side="left", fill="x", expand=True)
+        ttk.Button(img_frame, text="Browse", command=self._choose_img).pack(side="right")
 
-    # ---------------- helpers --------------------------------------------
-    def _copy_image(self, path):
-        src = pathlib.Path(path)
-        if src.exists():
-            dest = self.images_dir / src.name
-            dest.write_bytes(src.read_bytes())
+        stat_frame = ttk.Frame(self)
+        stat_frame.grid(row=3, column=0, columnspan=2, pady=4, sticky="ew")
+        ttk.Label(stat_frame, text="Attack").pack(side="left")
+        self.atk = ttk.Entry(stat_frame, width=5)
+        self.atk.pack(side="left", padx=(2, 10))
+        ttk.Label(stat_frame, text="Defense").pack(side="left")
+        self.defn = ttk.Entry(stat_frame, width=5)
+        self.defn.pack(side="left", padx=2)
 
-    def _save(self, v):
-        name = v[self.name_key].strip()
+        ttk.Button(self, text="Save", command=self._save).grid(row=4, column=0,
+                                                               columnspan=2, pady=6)
+
+    # ------------------------------------------------------------------ #
+    def _choose_img(self):
+        path = filedialog.askopenfilename(title="Select image")
+        if path:
+            self.img_path.set(path)
+
+    # ------------------------------------------------------------------ #
+    def _save(self):
+        name = self.name.get().strip()
         if not name:
-            sg.popup_error("Card name required")
+            messagebox.showerror("Missing data", "Card name is required")
             return
+
+        img_name = None
+        if self.img_path.get():
+            src = pathlib.Path(self.img_path.get())
+            if src.exists():
+                dest = self.images_dir / src.name
+                shutil.copy(src, dest)
+                img_name = src.name
+
         card = Card.new(
             name,
-            v[self.desc_key],
-            pathlib.Path(v[self.img_key]).name if v[self.img_key] else None,
-            int(v[self.atk_key] or 0),
-            int(v[self.def_key] or 0),
+            self.desc.get("1.0", "end").strip(),
+            img_name,
+            int(self.atk.get() or 0),
+            int(self.defn.get() or 0),
         )
         self.on_save(card)
-        sg.popup("Saved “%s”" % card.name)
+        messagebox.showinfo("Saved", f"Card “{card.name}” saved")
+        self._clear()
+
+    def _clear(self):
+        self.name.delete(0, "end")
+        self.desc.delete("1.0", "end")
+        self.img_path.set("")
+        self.atk.delete(0, "end")
+        self.defn.delete(0, "end")

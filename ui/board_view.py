@@ -1,53 +1,44 @@
 from __future__ import annotations
-import PySimpleGUI as sg
+import tkinter as tk
 from game.board import Board
-from game.card import Card
-from typing import Callable
+from game.card  import Card
 
 CELL = 64  # pixels
 
-class BoardView:
-    """Draws the grid and handles drag-n-drop placement."""
+class BoardView(tk.Canvas):
+    """Central board grid & placement logic."""
 
-    def __init__(self, board: Board, on_place: Callable[[int,int,Card],None]):
+    def __init__(self, master, board: Board,
+                 on_place, *args, **kwargs):
+        w, h = Board.WIDTH*CELL, Board.HEIGHT*CELL
+        super().__init__(master, width=w, height=h,
+                         background="white", highlightthickness=0,
+                         *args, **kwargs)
         self.board = board
         self.on_place = on_place
-        self._build_layout()
-
-    def layout(self):
-        return self.graph
-
-    # -------- internals --------------------------------------------------
-    def _build_layout(self):
-        w, h = Board.WIDTH * CELL, Board.HEIGHT * CELL
-        self.graph = sg.Graph(
-            canvas_size=(w, h),
-            graph_bottom_left=(0, 0),
-            graph_top_right=(w, h),
-            background_color="white",
-            enable_events=True,
-            drag_submits=True,
-            key="-GRAPH-",
-        )
         self._draw_grid()
+        self.bind("<Button-1>", self._click)
 
+    # ------------------------------------------------------------------ #
     def _draw_grid(self):
-        for x in range(Board.WIDTH + 1):
-            self.graph.draw_line((x*CELL, 0), (x*CELL, Board.HEIGHT*CELL))
-        for y in range(Board.HEIGHT + 1):
-            self.graph.draw_line((0, y*CELL), (Board.WIDTH*CELL, y*CELL))
+        for x in range(Board.WIDTH+1):
+            self.create_line(x*CELL, 0, x*CELL, Board.HEIGHT*CELL)
+        for y in range(Board.HEIGHT+1):
+            self.create_line(0, y*CELL, Board.WIDTH*CELL, y*CELL)
 
-    # -------- events -----------------------------------------------------
-    def read_event(self, event, values, selected_card: Card | None):
-        if event == "-GRAPH-" and selected_card:
-            x, y = values["-GRAPH-"]
-            gx, gy = int(x // CELL), int(y // CELL)
-            if self.board.place(gx, gy, selected_card):
-                self._render_card(gx, gy, selected_card)
-                self.on_place(gx, gy, selected_card)
+    # ------------------------------------------------------------------ #
+    def _click(self, event):
+        card = self.master.selected_card       # set by main_window
+        if not card:
+            return
+        gx, gy = event.x//CELL, event.y//CELL
+        if self.board.place(gx, gy, card):
+            self._render_card(gx, gy, card)
+            self.on_place(gx, gy, card)
 
-    def _render_card(self, gx, gy, card):
-        tl = (gx*CELL, gy*CELL)
-        br = ((gx+1)*CELL, (gy+1)*CELL)
-        self.graph.draw_rectangle(tl, br, fill_color="lightyellow")
-        self.graph.draw_text(card.name[:6], location=(tl[0]+CELL/2, tl[1]+CELL/2))
+    # ------------------------------------------------------------------ #
+    def _render_card(self, gx, gy, card: Card):
+        x0, y0 = gx*CELL, gy*CELL
+        x1, y1 = x0+CELL, y0+CELL
+        self.create_rectangle(x0, y0, x1, y1, fill="light yellow")
+        self.create_text(x0+CELL/2, y0+CELL/2, text=card.name[:6])
