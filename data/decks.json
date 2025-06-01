@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Wood",
+    "cards": [
+      {
+        "id": "a722354c-09a0-438d-bdd2-8b345a2e093b",
+        "name": "Bobber",
+        "description": "This bobber provides fish",
+        "image_path": "Screenshot 2024-10-30 224524.png",
+        "attack": 0,
+        "defense": 0
+      },
+      {
+        "id": "036cf16a-7b5e-4ce1-a483-716295ba73aa",
+        "name": "Fish",
+        "description": "You catch this",
+        "image_path": "Screenshot 2024-02-27 183854.png",
+        "attack": 5,
+        "defense": 4
+      }
+    ]
+  }
+]

@@ -3,17 +3,17 @@ from dataclasses import dataclass, asdict
 from typing import Dict, Any, Optional, List, Tuple
 import uuid
 
-Point = Tuple[int, int]
+Point = Tuple[int, int]        # (x, y) within 0-64 canvas coordinates
 
 
 @dataclass
-class Piece:
-    """Movable miniature / piece (optionally custom polygon)."""
+class Token:
+    """Cardboard cut-out token (optionally custom polygon)."""
     id: str
     name: str
     description: str = ""
     image_path: Optional[str] = None
-    points: List[Point] | None = None          # defaulted **last**
+    points: List[Point] | None = None          # <-- defaulted **last**
 
     # -------------- helpers ------------------------------------------- #
     @classmethod
@@ -26,5 +26,5 @@ class Piece:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Piece":
+    def from_dict(cls, d: Dict[str, Any]) -> "Token":
         return cls(**d)
