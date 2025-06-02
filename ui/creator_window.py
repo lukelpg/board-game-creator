@@ -6,12 +6,14 @@ from typing import List
 
 from game import Card, Piece, Token, Deck
 from game.game_data import GameData, BoardSpec
+from game.free_board      import FreeBoard
 from .board_view    import BoardView
 from .card_editor   import CardEditor
 from .piece_editor  import PieceEditor
 from .token_editor  import TokenEditor
 from .catalog_view  import CatalogViewer
 from .section_catalog import SectionCatalog
+from .free_board_view   import FreeBoardView
 
 # --------------------------------------------------------------------- #
 def open_creator(games_dir: pathlib.Path,
@@ -116,29 +118,67 @@ def open_creator(games_dir: pathlib.Path,
     # ---------- new board dialog -------------------------------------- #
     def _new_board():
         bname = simpledialog.askstring("Board Name", "Board name:", parent=root)
-        if not bname: return
-        w = simpledialog.askinteger("Columns", "Width:", minvalue=1, initialvalue=8, parent=root)
-        h = simpledialog.askinteger("Rows",    "Height:",minvalue=1, initialvalue=8, parent=root)
-        if not (w and h): return
-        spec = BoardSpec(bname, w, h, [])
-        boards.append(spec); _add_board_tab(spec)
+        if not bname:
+            return
+        w = simpledialog.askinteger("Width (px)", "Canvas width:",  minvalue=200, initialvalue=800, parent=root)
+        h = simpledialog.askinteger("Height (px)", "Canvas height:", minvalue=200, initialvalue=600, parent=root)
+        if not (w and h):
+            return
+
+        style = simpledialog.askstring("Style",
+                                    "grid  /  free",
+                                    initialvalue="free",
+                                    parent=root)
+        style = (style or "free").lower()
+
+        if style == "grid":
+            # ------------- old grid board ------------------------------- #
+            spec = BoardSpec(bname, 8, 8, [])          # grid spec still 8×8 cells
+            boards.append(spec)
+
+            frm  = ttk.Frame(board_notebook)
+            view = BoardView(frm, spec.build(), img_dir)
+            view.pack()
+            board_notebook.add(frm, text=bname)
+            board_views.append(view)
+
+        else:
+            # ------------- new FREE board ------------------------------- #
+            fb = FreeBoard(w, h, [], [])                # ← FreeBoard object
+            frm = ttk.Frame(board_notebook)
+            view = FreeBoardView(frm, fb, img_dir)
+            view.pack()
+            board_notebook.add(frm, text=bname)
+            board_views.append(view)
 
     # ---------- save file --------------------------------------------- #
     def _save():
         # sync board specs with current board_views
-        for spec, view in zip(boards, board_views):
-            bd = view.board
-            spec.width, spec.height = bd.WIDTH, bd.HEIGHT
-            spec.sections = [
-                {
-                    "name":     getattr(sec, "name", "Area"),
-                    "kind":     sec.kind.value,
-                    "points":   sec.points,                 # list[(gx,gy)]
-                    "outline":  getattr(sec, "outline", "#808080"),
-                    "fill":     getattr(sec, "fill", ""),
-                }
-                for sec in bd.sections
-            ]
+        for view in board_views:
+            if isinstance(view, BoardView):
+                bd = view.board
+                tab_title = board_notebook.tab(board_notebook.tabs()[idx], "text")
+                spec = BoardSpec(tab_title, bd.WIDTH, bd.HEIGHT, [
+                    dict(points=s.points,
+                        kind=s.kind.value,
+                        outline=getattr(s, "outline", "#808080"),
+                        fill=getattr(s, "fill", ""))
+                    for s in bd.sections
+                ])
+                boards.append(spec)              # store in list to save
+            else:   # FreeBoardView
+                fb = view.fb
+                boards.append(dict(               # store as raw dict
+                    name=view.master.cget("text"),
+                    mode="free",
+                    width=fb.width,
+                    height=fb.height,
+                    sections=fb.sections,
+                    placed=[dict(type=type(p.obj).__name__,
+                                name=p.obj.name,
+                                x=p.x, y=p.y)
+                            for p in fb.placed]
+                ))
 
         gd.cards , gd.pieces, gd.tokens, gd.decks, gd.boards = \
             cards, pieces, tokens, decks, boards
