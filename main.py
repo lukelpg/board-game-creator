@@ -1,12 +1,13 @@
-"""Application entry-point."""
-import pathlib
-from ui.main_window import run_app
+"""Entry point – launches the game selector."""
+import pathlib, sys
+from ui.launcher import launch_selector
 
 BASE = pathlib.Path(__file__).parent
 DATA_DIR = BASE / "data"
+GAMES_DIR = DATA_DIR / "games"
 IMAGES_DIR = DATA_DIR / "images"
-for d in (DATA_DIR, IMAGES_DIR):
+for d in (DATA_DIR, GAMES_DIR, IMAGES_DIR):
     d.mkdir(exist_ok=True)
 
 if __name__ == "__main__":
-    run_app(DATA_DIR, IMAGES_DIR)
+    sys.exit(launch_selector(GAMES_DIR, IMAGES_DIR))

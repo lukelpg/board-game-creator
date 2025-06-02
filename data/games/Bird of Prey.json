@@ -1,0 +1,263 @@
+{
+  "name": "Bird of Prey",
+  "cards": [
+    {
+      "id": "619b7e0e-0787-4aec-8fb3-f509d3491542",
+      "name": "Burrow",
+      "description": "Generic burrow",
+      "image_path": "Screenshot 2024-03-11 135101.png",
+      "attack": 0,
+      "defense": 3
+    },
+    {
+      "id": "1c0ae517-22f9-4708-b326-407e3509453d",
+      "name": "Grass Land",
+      "description": "Generic grass lands",
+      "image_path": "Screenshot 2024-01-21 151635.png",
+      "attack": 0,
+      "defense": 0
+    },
+    {
+      "id": "caaf59eb-84a5-4b96-963d-33c66c339533",
+      "name": "Lone Tree",
+      "description": "Home of resources and a good home for birds nests",
+      "image_path": "Screenshot 2024-04-12 224503.png",
+      "attack": 0,
+      "defense": 0
+    }
+  ],
+  "pieces": [
+    {
+      "id": "24a331cb-353d-4f6d-a3cf-ac594f9b91b3",
+      "name": "Hawk",
+      "description": "The bird of prey",
+      "image_path": "Screenshot 2024-02-13 203741.png",
+      "points": null
+    }
+  ],
+  "tokens": [
+    {
+      "id": "8f719a30-c265-4e56-b927-271a98df818c",
+      "name": "Nuts",
+      "description": "Food for the rodents",
+      "image_path": "Screenshot 2024-11-07 191055.png",
+      "points": [
+        [
+          28,
+          52
+        ],
+        [
+          18,
+          47
+        ],
+        [
+          14,
+          40
+        ],
+        [
+          13,
+          32
+        ],
+        [
+          11,
+          25
+        ],
+        [
+          11,
+          18
+        ],
+        [
+          8,
+          21
+        ],
+        [
+          4,
+          20
+        ],
+        [
+          3,
+          12
+        ],
+        [
+          3,
+          10
+        ],
+        [
+          9,
+          8
+        ],
+        [
+          13,
+          8
+        ],
+        [
+          17,
+          8
+        ],
+        [
+          24,
+          8
+        ],
+        [
+          28,
+          8
+        ],
+        [
+          29,
+          8
+        ],
+        [
+          29,
+          2
+        ],
+        [
+          29,
+          2
+        ],
+        [
+          33,
+          2
+        ],
+        [
+          33,
+          5
+        ],
+        [
+          33,
+          6
+        ],
+        [
+          36,
+          6
+        ],
+        [
+          38,
+          6
+        ],
+        [
+          41,
+          6
+        ],
+        [
+          43,
+          6
+        ],
+        [
+          45,
+          6
+        ],
+        [
+          51,
+          6
+        ],
+        [
+          53,
+          6
+        ],
+        [
+          54,
+          7
+        ],
+        [
+          59,
+          11
+        ],
+        [
+          59,
+          13
+        ],
+        [
+          59,
+          14
+        ],
+        [
+          59,
+          14
+        ],
+        [
+          56,
+          18
+        ],
+        [
+          53,
+          17
+        ],
+        [
+          52,
+          16
+        ],
+        [
+          51,
+          15
+        ],
+        [
+          48,
+          15
+        ],
+        [
+          49,
+          19
+        ],
+        [
+          49,
+          27
+        ],
+        [
+          49,
+          28
+        ],
+        [
+          48,
+          34
+        ],
+        [
+          47,
+          37
+        ],
+        [
+          46,
+          40
+        ],
+        [
+          42,
+          43
+        ],
+        [
+          38,
+          46
+        ],
+        [
+          35,
+          48
+        ]
+      ]
+    }
+  ],
+  "decks": [
+    {
+      "name": "Spring",
+      "cards": []
+    },
+    {
+      "name": "Summer",
+      "cards": []
+    },
+    {
+      "name": "Fall",
+      "cards": []
+    }
+  ],
+  "board": {
+    "w": 8,
+    "h": 8,
+    "sections": [
+      {
+        "x0": 1,
+        "y0": 1,
+        "x1": 2,
+        "y1": 2,
+        "kind": "Deck"
+      }
+    ]
+  }
+}
