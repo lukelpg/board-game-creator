@@ -20,11 +20,10 @@ class SectionType(str, Enum):
 @dataclass
 class Section:
     x0: int; y0: int
-    x1: int; y1: int              # inclusive grid coords
+    x1: int; y1: int
     kind: SectionType
 
 
-# ------------ board cells --------------------------------------------- #
 @dataclass
 class Cell:
     x: int
@@ -32,9 +31,8 @@ class Cell:
     occupant: Card | Piece | Token | Deck | None = None
 
 
-# ------------ dynamic board ------------------------------------------- #
 class Board:
-    """Rectangular board with type-restricted sections."""
+    """Rectangular board with typed sections and mutability."""
 
     def __init__(self, width: int = 8, height: int = 8):
         self.sections: List[Section] = []
@@ -46,14 +44,14 @@ class Board:
         self.grid: List[List[Cell]] = [
             [Cell(x, y) for x in range(width)] for y in range(height)
         ]
-        self.sections.clear()               # drop old sections on resize
+        self.sections.clear()
 
     # ------------------------------------------------------------------ #
     def add_section(self, x0, y0, x1, y1, kind: SectionType):
         self.sections.append(Section(x0, y0, x1, y1, kind))
 
     # ------------------------------------------------------------------ #
-    def _section_for(self, x: int, y: int) -> Optional[Section]:
+    def _section_for(self, x, y):
         for s in self.sections:
             if s.x0 <= x <= s.x1 and s.y0 <= y <= s.y1:
                 return s
@@ -66,7 +64,7 @@ class Board:
             return False
 
         sec = self._section_for(x, y)
-        if sec:                                  # enforce section rules
+        if sec:
             if sec.kind is SectionType.CARD  and not isinstance(obj, Card):   return False
             if sec.kind is SectionType.PIECE and not isinstance(obj, Piece):  return False
             if sec.kind is SectionType.TOKEN and not isinstance(obj, Token):  return False
@@ -74,7 +72,7 @@ class Board:
 
         cell = self.grid[y][x]
         if cell.occupant:
-            return False                        # already occupied
+            return False
 
         cell.occupant = obj
         return True
