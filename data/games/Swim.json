@@ -1,0 +1,15 @@
+{
+  "name": "Swim",
+  "cards": [],
+  "pieces": [],
+  "tokens": [],
+  "decks": [],
+  "boards": [
+    {
+      "name": "Main",
+      "w": 8,
+      "h": 8,
+      "sections": []
+    }
+  ]
+}

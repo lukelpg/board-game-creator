@@ -1,15 +1,16 @@
 from __future__ import annotations
 from typing import List
 from .card import Card
-import json, random, pathlib
+import json, random, pathlib, copy
 
 
 class Deck:
-    """Just a shuffled list of Card objects."""
+    """Named pile of cards with draw / shuffle / reset."""
 
     def __init__(self, name: str, cards: List[Card] | None = None):
-        self.name = name
-        self.cards = cards[:] if cards else []
+        self.name      = name
+        self._original = cards[:] if cards else []
+        self.cards     = self._original[:]
 
     # ---------------- gameplay ----------------------------------------- #
     def shuffle(self):
@@ -18,15 +19,21 @@ class Deck:
     def draw(self) -> Card | None:
         return self.cards.pop() if self.cards else None
 
+    def reset(self):
+        self.cards = self._original[:]
+
     # ---------------- persistence -------------------------------------- #
     def to_dict(self):
         return {"name": self.name,
-                "cards": [c.to_dict() for c in self.cards]}
+                "cards": [c.to_dict() for c in self._original]}
 
     @classmethod
     def from_dict(cls, d):
         from .card import Card
         return cls(d["name"], [Card.from_dict(cd) for cd in d["cards"]])
 
-    def save(self, path: pathlib.Path):
-        path.write_text(json.dumps(self.to_dict(), indent=2))
+    # quick clone (used by BoardView when resetting pile on board)
+    def clone(self):                   # keeps original list intact
+        dup = Deck(self.name, self._original)
+        dup.cards = self.cards[:]
+        return dup

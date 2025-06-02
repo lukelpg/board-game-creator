@@ -1,7 +1,7 @@
 from __future__ import annotations
 import tkinter as tk, json, pathlib
 from tkinter import ttk, simpledialog, messagebox
-from game.game_data import GameData
+from game.game_data import GameData, BoardSpec
 from ui.creator_window import open_creator
 from ui.play_window    import open_player
 
@@ -26,12 +26,11 @@ def launch_selector(games_dir: pathlib.Path, images_dir: pathlib.Path):
         if path.exists():
             messagebox.showerror("Exists", "A game with that name exists")
             return
+
         blank = GameData(
             name,
-            [], [], [], [],                               # no objects yet
-            [                                             # one default board
-                GameData.BoardSpec("Main", 8, 8, []).to_dict()
-            ],
+            [], [], [], [],                         # empty cards/pieces/tokens/decks
+            [BoardSpec("Main", 8, 8, [])]           # ➜ one default board
         )
         path.write_text(json.dumps(blank.to_dict(), indent=2))
         refresh()
