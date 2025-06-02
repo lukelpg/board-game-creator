@@ -19,9 +19,27 @@ class BoardSpec:
 
     def build(self) -> Board:
         bd = Board(self.width, self.height)
-        for s in self.sections:
-            bd.add_section(s["x0"], s["y0"], s["x1"], s["y1"],
-                           SectionType(s["kind"]))
+
+        for raw in self.sections:
+            # unified accessor helpers
+            pts  = raw.get("points")
+            kind = raw.get("kind", "Any")
+            name = raw.get("name", "Area")
+            out  = raw.get("outline", "#808080")
+            fill = raw.get("fill", "")
+
+            # legacy rectangle → make a 4-point polygon
+            if pts is None and {"x0", "y0", "x1", "y1"} <= raw.keys():
+                pts = [(raw["x0"],      raw["y0"]),
+                       (raw["x1"] + 1, raw["y0"]),
+                       (raw["x1"] + 1, raw["y1"] + 1),
+                       (raw["x0"],      raw["y1"] + 1)]
+
+            bd.add_section(name,
+                           SectionType(kind.capitalize()),
+                           pts,
+                           out,
+                           fill)
         return bd
 
     def to_dict(self):

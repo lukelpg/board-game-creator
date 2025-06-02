@@ -5,14 +5,13 @@ import json, pathlib
 from typing import List
 
 from game import Card, Piece, Token, Deck
-from game.board     import SectionType
 from game.game_data import GameData, BoardSpec
 from .board_view    import BoardView
 from .card_editor   import CardEditor
 from .piece_editor  import PieceEditor
 from .token_editor  import TokenEditor
 from .catalog_view  import CatalogViewer
-
+from .section_catalog import SectionCatalog
 
 # --------------------------------------------------------------------- #
 def open_creator(games_dir: pathlib.Path,
@@ -85,6 +84,15 @@ def open_creator(games_dir: pathlib.Path,
     ttk.Button(side, text="Catalog",
                command=lambda: CatalogViewer(root, cards, pieces, tokens, img_dir))\
         .pack(fill="x", pady=(2,4))
+    ttk.Button(
+        side,
+        text="Sections",
+        command=lambda: SectionCatalog(
+            root,
+            _current_view().board.sections,   # ← sections of the board you’re looking at
+            _current_view()._redraw_all       # ← redraw callback
+        )
+    ).pack(fill="x", pady=(2, 4))
     ttk.Button(side, text="Save Game", command=lambda:_save())\
         .pack(fill="x", pady=(10,2))
     ttk.Button(side, text="Close", command=root.destroy).pack(fill="x")
@@ -121,8 +129,16 @@ def open_creator(games_dir: pathlib.Path,
         for spec, view in zip(boards, board_views):
             bd = view.board
             spec.width, spec.height = bd.WIDTH, bd.HEIGHT
-            spec.sections = [dict(x0=s.x0, y0=s.y0, x1=s.x1, y1=s.y1,
-                                  kind=s.kind.value) for s in bd.sections]
+            spec.sections = [
+                {
+                    "name":     getattr(sec, "name", "Area"),
+                    "kind":     sec.kind.value,
+                    "points":   sec.points,                 # list[(gx,gy)]
+                    "outline":  getattr(sec, "outline", "#808080"),
+                    "fill":     getattr(sec, "fill", ""),
+                }
+                for sec in bd.sections
+            ]
 
         gd.cards , gd.pieces, gd.tokens, gd.decks, gd.boards = \
             cards, pieces, tokens, decks, boards

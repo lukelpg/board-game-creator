@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from enum import Enum
 
 from .card  import Card
@@ -9,21 +9,25 @@ from .token import Token
 from .deck  import Deck
 
 
+Point = Tuple[int, int] 
+
+
 # ---------- section system ------------------------------------------- #
 class SectionType(str, Enum):
     CARD  = "Card"
     PIECE = "Piece"
     TOKEN = "Token"
     DECK  = "Deck"
-    ANY   = "Any"      # accepts everything
+    ANY   = "Any"
 
 
 @dataclass
 class Section:
-    x0: int; y0: int
-    x1: int; y1: int
-    kind: SectionType
-
+    name:   str
+    kind:   SectionType
+    points: List[Point]          # ordered polygon vertices
+    outline: str = "#808080"
+    fill:    str = ""            # empty = transparent
 
 # ---------- cell holds **stack** ------------------------------------- #
 @dataclass
@@ -53,12 +57,27 @@ class Board:
         self.sections.clear()
 
     # ------------------------------------------------------------- #
-    def add_section(self, x0, y0, x1, y1, kind: SectionType):
-        self.sections.append(Section(x0, y0, x1, y1, kind))
+    def add_section(self, name, kind: SectionType,
+                    points: List[Point],
+                    outline="#808080", fill=""):
+        self.sections.append(Section(name, kind, points, outline, fill))
 
-    def _section_for(self, x, y) -> Optional[Section]:
-        return next((s for s in self.sections
-                     if s.x0 <= x <= s.x1 and s.y0 <= y <= s.y1), None)
+    @staticmethod
+    def _pnpoly(pts: List[Point], x: int, y: int) -> bool:
+        inside = False
+        n = len(pts)
+        for i, (xi, yi) in enumerate(pts):
+            xj, yj = pts[(i + 1) % n]
+            if ((yi > y) != (yj > y)) and \
+               (x < (xj - xi) * (y - yi) / (yj - yi + 1e-9) + xi):
+                inside = not inside
+        return inside
+
+    # replace _section_for with:
+    def _section_for(self, gx, gy):
+        for s in self.sections:
+            if self._pnpoly(s.points, gx + .5, gy + .5):
+                return s
 
     # ------------------------------------------------------------- #
     def can_accept(self, x: int, y: int, obj) -> bool:
