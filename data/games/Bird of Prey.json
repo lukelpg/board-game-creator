@@ -247,17 +247,26 @@
       "cards": []
     }
   ],
-  "board": {
-    "w": 8,
-    "h": 8,
-    "sections": [
-      {
-        "x0": 1,
-        "y0": 1,
-        "x1": 2,
-        "y1": 2,
-        "kind": "Deck"
-      }
-    ]
-  }
+  "boards": [
+    {
+      "name": "Main",
+      "w": 8,
+      "h": 8,
+      "sections": [
+        {
+          "x0": 1,
+          "y0": 1,
+          "x1": 2,
+          "y1": 2,
+          "kind": "Deck"
+        }
+      ]
+    },
+    {
+      "name": "Seasons",
+      "w": 4,
+      "h": 1,
+      "sections": []
+    }
+  ]
 }
