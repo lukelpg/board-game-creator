@@ -43,14 +43,38 @@ class BoardSpec:
         return bd
 
     def to_dict(self):
-        return {"name": self.name,
-                "w": self.width,
-                "h": self.height,
-                "sections": self.sections}
+        return {
+            "name": self.name,
+            "w": self.width,
+            "h": self.height,
+            "sections": self.sections
+        }
 
     @classmethod
     def from_dict(cls, d):
-        return cls(d["name"], d["w"], d["h"], d["sections"])
+        """
+        Accept either old‐style ('w','h') or new‐style ('width','height').
+        """
+        # Extract the board name (should always exist)
+        name = d.get("name", "")
+
+        # Old style:  keys 'w' and 'h'
+        if "w" in d and "h" in d:
+            w = d["w"]
+            h = d["h"]
+            secs = d.get("sections", [])
+            return cls(name, w, h, secs)
+
+        # New style: keys 'width' and 'height'
+        if "width" in d and "height" in d:
+            w = d["width"]
+            h = d["height"]
+            secs = d.get("sections", [])
+            return cls(name, w, h, secs)
+
+        # Fallback: if someone saved a BoardSpec via to_dict(), 'w' & 'h' should exist.
+        # If not, treat it as an empty 8×8 board.
+        return cls(name, 8, 8, d.get("sections", []))
 
 
 # ---------- full game data -------------------------------------------- #

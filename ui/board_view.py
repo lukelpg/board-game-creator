@@ -297,15 +297,42 @@ class BoardView(tk.Canvas):
         if (gx0, gy0) == (gx1, gy1):
             self._reset_sec_binds()
             return
+
+        # build four‐corner polygon
         pts = [(gx0, gy0), (gx1 + 1, gy0),
                (gx1 + 1, gy1 + 1), (gx0, gy1 + 1)]
-        name = simpledialog.askstring("Section name", "Name:", parent=self.master) or "Area"
-        kind = simpledialog.askstring("Type", "card/piece/token/deck/any:",
-                                      initialvalue="Any", parent=self.master) or "Any"
-        self.board.add_section(name,
-                               SectionType(kind.capitalize()),
-                               pts,
-                               "#808080", "")
+
+        # name & kind
+        name = simpledialog.askstring(
+            "Section name", "Name:", parent=self.master
+        ) or "Area"
+        kind = simpledialog.askstring(
+            "Type", "card/piece/token/deck/any:",
+            initialvalue="Any", parent=self.master
+        ) or "Any"
+
+        # outline colour (default "#808080")
+        outline = colorchooser.askcolor(
+            title="Outline colour",
+            initialcolor="#808080"
+        )[1] or "#808080"
+
+        # fill colour (default "#ffffff"; if user cancels, this yields "")
+        chosen = colorchooser.askcolor(
+            title="Fill colour (cancel = none)",
+            initialcolor="#ffffff"
+        )[1]
+        fill = chosen if chosen is not None else ""
+
+        # add the section with both colours
+        self.board.add_section(
+            name,
+            SectionType(kind.capitalize()),
+            pts,
+            outline,
+            fill
+        )
+
         self._reset_sec_binds()
         self._redraw_all()
 

@@ -24,7 +24,7 @@ def open_player(games_dir: pathlib.Path,
     cards  = {c["name"]: Card.from_dict(c)   for c in raw.get("cards",  [])}
     pieces = {p["name"]: Piece.from_dict(p)  for p in raw.get("pieces", [])}
     tokens = {t["name"]: Token.from_dict(t)  for t in raw.get("tokens", [])}
-    decks  = {d["name"]: Deck.from_dict(d)   for d in raw.get("decks",  [])}
+    decks  = {d["name"]: Deck.from_dict(d, cards) for d in raw.get("decks", [])}
 
     # ---------- window shell ----------------------------------------- #
     root = tk.Toplevel()

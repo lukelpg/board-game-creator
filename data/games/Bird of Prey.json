@@ -267,76 +267,28 @@
       "height": 8,
       "sections": [
         {
-          "name": "Area",
-          "kind": "Deck",
-          "points": [
-            [
-              1,
-              1
-            ],
-            [
-              3,
-              1
-            ],
-            [
-              3,
-              3
-            ],
-            [
-              1,
-              3
-            ]
-          ],
-          "outline": "#808080",
-          "fill": ""
-        },
-        {
-          "name": "Area",
+          "name": "Testing",
           "kind": "Any",
           "points": [
             [
-              1,
-              1
+              0,
+              6
             ],
             [
-              3,
-              1
+              8,
+              6
             ],
             [
-              3,
-              3
-            ],
-            [
-              1,
-              3
-            ]
-          ],
-          "outline": "#808080",
-          "fill": ""
-        },
-        {
-          "name": "River",
-          "kind": "Any",
-          "points": [
-            [
-              3,
-              4
-            ],
-            [
-              4,
-              4
-            ],
-            [
-              4,
+              8,
               8
             ],
             [
-              3,
+              0,
               8
             ]
           ],
-          "outline": "#004080",
-          "fill": "#00ffff"
+          "outline": "#ff0080",
+          "fill": "#8080c0"
         }
       ]
     },
@@ -347,55 +299,7 @@
       "height": 1,
       "sections": [
         {
-          "name": "Area",
-          "kind": "Deck",
-          "points": [
-            [
-              0,
-              0
-            ],
-            [
-              4,
-              0
-            ],
-            [
-              4,
-              1
-            ],
-            [
-              0,
-              1
-            ]
-          ],
-          "outline": "#808080",
-          "fill": ""
-        },
-        {
-          "name": "Area",
-          "kind": "Token",
-          "points": [
-            [
-              0,
-              0
-            ],
-            [
-              4,
-              0
-            ],
-            [
-              4,
-              1
-            ],
-            [
-              0,
-              1
-            ]
-          ],
-          "outline": "#808080",
-          "fill": ""
-        },
-        {
-          "name": "Area",
+          "name": "Season Decks",
           "kind": "Deck",
           "points": [
             [
@@ -449,20 +353,68 @@
           ],
           "outline": "#0080c0",
           "fill": "#0080ff"
+        },
+        {
+          "name": "Test",
+          "kind": "Any",
+          "points": [
+            [
+              6,
+              1
+            ],
+            [
+              9,
+              1
+            ],
+            [
+              9,
+              3
+            ],
+            [
+              6,
+              3
+            ]
+          ],
+          "outline": "#8080ff",
+          "fill": "#8080ff"
+        },
+        {
+          "name": "Cards",
+          "kind": "Any",
+          "points": [
+            [
+              2,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              3,
+              2
+            ],
+            [
+              2,
+              2
+            ]
+          ],
+          "outline": "#00ff40",
+          "fill": "#ffff00"
         }
       ],
       "placed": [
         {
           "type": "Deck",
           "name": "Spring",
-          "x": 107,
-          "y": 345
+          "x": 123,
+          "y": 214
         },
         {
           "type": "Card",
           "name": "Grass Land",
-          "x": 209,
-          "y": 345
+          "x": 260,
+          "y": 208
         }
       ]
     }
