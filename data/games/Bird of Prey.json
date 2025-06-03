@@ -236,15 +236,27 @@
   "decks": [
     {
       "name": "Spring",
-      "cards": []
+      "cards": [
+        "Burrow",
+        "Lone Tree",
+        "Grass Land"
+      ]
     },
     {
       "name": "Summer",
-      "cards": []
+      "cards": [
+        "Burrow",
+        "Lone Tree",
+        "Grass Land"
+      ]
     },
     {
       "name": "Fall",
-      "cards": []
+      "cards": [
+        "Burrow",
+        "Lone Tree",
+        "Grass Land"
+      ]
     }
   ],
   "boards": [

@@ -82,10 +82,13 @@ class GameData:
         from .token import Token
         from .deck  import Deck
 
-        cards  = [Card .from_dict(c) for c in d.get("cards" , [])]
+        cards  = [Card .from_dict(c) for c in d.get("cards", [])]
+        card_map = {c.name: c for c in cards}
+
         pieces = [Piece.from_dict(p) for p in d.get("pieces", [])]
         tokens = [Token.from_dict(t) for t in d.get("tokens", [])]
-        decks  = [Deck .from_dict(k) for k in d.get("decks" , [])]
+
+        decks  = [Deck.from_dict(dd, card_map) for dd in d.get("decks", [])]
 
         # ---- NEW format ------------------------------------------------
         if "boards" in d:

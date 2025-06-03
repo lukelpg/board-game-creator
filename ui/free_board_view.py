@@ -161,23 +161,32 @@ class FreeBoardView(tk.Canvas):
         obj   = top_p.obj
 
         menu = tk.Menu(self, tearoff=0)
-        menu.add_command(label="Delete",
-                         command=lambda: (self.fb.remove(top_p), self._redraw()))
-
         if isinstance(obj, Deck):
-            menu.add_command(label="Draw card",
-                             command=lambda d=obj: self._draw_card(d))
+            menu.add_command(label="Draw",
+                             command=lambda d=obj:
+                                        self._draw_card(d))
+            menu.add_separator()
             menu.add_command(label="Shuffle",
-                             command=lambda d=obj: (d.shuffle(), self._redraw()))
+                             command=lambda d=obj: (d.shuffle(),
+                                                    self._redraw()))
             menu.add_command(label="Reset",
-                             command=lambda d=obj: (d.reset(),   self._redraw()))
+                             command=lambda d=obj: (d.reset(),
+                                                    self._redraw()))
+            menu.add_separator()
+        menu.add_command(label="Delete",
+                         command=lambda p=top_p: (self.fb.remove(p),
+                                                  self._redraw()))
         menu.tk_popup(ev.x_root, ev.y_root)
 
     def _draw_card(self, deck: Deck):
-        if not deck.cards:
+        if not deck.cards: 
+            messagebox.showinfo("Deck empty",
+                                "This pile has no cards left.",
+                                parent=self.winfo_toplevel())
             return
         c = deck.draw()
         messagebox.showinfo("Drew", f"{c.name}\n\n{c.description}", parent=self)
+        self.winfo_toplevel().selected_obj = c    # selected for placement
         self._redraw()
 
     # ===================================================== #
@@ -242,3 +251,27 @@ class FreeBoardView(tk.Canvas):
         self.bind("<B1-Motion>", self._move_drag)
         self.bind("<ButtonRelease-1>", self._drop)
         self.mode.set("place")
+    
+    def _preview_img(self, obj):
+        key = f"prev::{getattr(obj,'image_path', obj.name)}"
+        if key in self._preview_cache:
+            return self._preview_cache[key]
+
+        if getattr(obj, "image_path", None):
+            im = Image.open(self.img_dir / obj.image_path)
+        else:
+            im = Image.new("RGBA", (CELL, CELL), "#aaaaaa88")
+
+        scl = 0.4
+        im = im.resize((int(CELL * scl), int(CELL * scl)), Image.LANCZOS)
+        self._preview_cache[key] = ImageTk.PhotoImage(im)
+        return self._preview_cache[key]
+    
+    def _mouse_move(self, ev):
+        self.delete("cursor_preview")
+        sel = getattr(self.winfo_toplevel(), "selected_obj", None)
+        if sel:
+            self.create_image(ev.x, ev.y,
+                            image=self._preview_img(sel),
+                            anchor="center",
+                            tags="cursor_preview")

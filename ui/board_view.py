@@ -1,94 +1,89 @@
 # ui/board_view.py
 from __future__ import annotations
 
-import itertools
-import pathlib
-from typing import Dict, List
+import itertools, pathlib, tkinter as tk
+from tkinter import ttk, simpledialog, colorchooser, messagebox
+from typing import Dict, List, Tuple
 
-import tkinter as tk
-from tkinter import simpledialog, colorchooser, messagebox
 from PIL import Image, ImageTk
 
-from game.board import Board, SectionType
-from game.card import Card
-from game.deck import Deck
-from game.piece import Piece
-from game.token import Token
+from game.board  import Board, SectionType
+from game.card   import Card
+from game.piece  import Piece
+from game.token  import Token
+from game.deck   import Deck
 
 # -------------------------------------------------------------------- #
-CELL   = 64        # square size in pixels
-OFFSET = 8         # diagonal offset between stacked objects
-RADIUS = 10        # rounded-corner radius for card silhouette
+CELL   = 64
+OFFSET = 8
+RADIUS = 10
+PREVIEW_SCALE = 0.4                # cursor-preview sprite scale
+
 
 # -------------------------------------------------------------------- #
 class BoardView(tk.Canvas):
     """
-    Editing & play canvas.
+    Grid canvas with stacks, drag-to-move, erase, deck draw → cursor.
 
-    Controls
-    --------
-    Placement / stacks
-        Left-click         place selected object (or paint-anywhere)
-        Right-click        pop top of stack / draw card from deck
-        Ctrl+Right-click   shuffle top deck
-        Alt +Right-click   reset top deck
-        Space              toggle paint-anywhere (ignores section rules)
-
-    Sections
-        S                  begin polygon section mode
-        (while drawing)    Left-click to add vertices
-        Enter              finish polygon, choose props
-        Esc                cancel polygon
-        Shift+Right-click  edit / delete an existing section
-
-    Public helper
-        enter_section_mode()  – called by sidebar “Section (drag)” button
-                                to draw a quick rectangle (drag & type)
+    • Radio palette bottom-left: Place / Move / Erase   (Space cycles)
+    • Right-click deck  → pop card + auto-select
+    • Selected object follows cursor as translucent preview
     """
 
-    # ---------------------------------------------------------------- #
+    # ================================================================ #
     def __init__(self, master, board: Board, img_dir: pathlib.Path):
-        super().__init__(master,
-                         width=board.WIDTH * CELL,
+        super().__init__(master, width=board.WIDTH * CELL,
                          height=board.HEIGHT * CELL,
-                         background="white",
-                         highlightthickness=0)
+                         background="white", highlightthickness=0)
 
         self.board   = board
         self.img_dir = img_dir
         self._cache: Dict[str, ImageTk.PhotoImage] = {}
+        self._preview_cache: Dict[str, ImageTk.PhotoImage] = {}
 
-        # mode/state flags
-        self.mode            = "place"   # place | paint | poly | section
-        self.paint_anywhere  = False
-        self.sec_start: tuple[int, int] | None = None
-        self.poly_pts: List[tuple[int, int]] = []
+        # ---- tool mode --------------------------------------------- #
+        self.mode = tk.StringVar(value="place")      # place / move / erase
+        self._build_palette(master)
 
-        # event bindings
+        # ---- drag state -------------------------------------------- #
+        self.drag_src: Tuple[int, int] | None = None
+
+        # ---- bindings ---------------------------------------------- #
         self.bind("<Button-1>",        self._left)
-        self.bind("<ButtonRelease-1>", self._release)
         self.bind("<B1-Motion>",       self._drag)
+        self.bind("<ButtonRelease-1>", self._drop)
         self.bind("<Button-3>",        self._right)
 
-        master.bind_all("<space>",     self._toggle_paint)
-        master.bind_all("s",           self._start_poly)
-        master.bind_all("<Return>",    self._finish_poly)
-        master.bind_all("<Escape>",    self._cancel_poly)
+        self.bind_all("<space>",       self._cycle_tool)
+        self.bind("<Motion>",          self._mouse_move)
 
         self._redraw_all()
 
+    # ---------------------------------------------------------------- #
+    def _build_palette(self, master):
+        bar = ttk.Frame(master); bar.pack(side="bottom", fill="x")
+        for txt in ("place", "move", "erase"):
+            ttk.Radiobutton(bar, text=txt.capitalize(),
+                            value=txt, variable=self.mode).pack(side="left")
+        ttk.Label(bar, text=" ⎵ cycles ").pack(side="right")
+
+    def _cycle_tool(self, _e):
+        order = ("place", "move", "erase")
+        cur   = order.index(self.mode.get())
+        self.mode.set(order[(cur + 1) % len(order)])
+
     # ================================================================ #
-    #  High-level redraw                                               #
+    #  Main redraw                                                     #
     # ================================================================ #
     def _redraw_all(self):
         self.delete("all")
-        self._draw_grid()
-        self._draw_sections()
+        self._grid(); self._sections()
         for row in self.board.grid:
             for cell in row:
-                self._draw_stack(cell.x, cell.y, cell.stack)
+                for i, obj in enumerate(cell.stack):
+                    self._draw_obj(cell.x, cell.y, obj, i * OFFSET)
 
-    def _draw_grid(self):
+    def _grid(self):
         for x in range(self.board.WIDTH + 1):
             self.create_line(x * CELL, 0,
                              x * CELL, self.board.HEIGHT * CELL)
@@ -96,266 +91,241 @@ class BoardView(tk.Canvas):
             self.create_line(0, y * CELL,
                              self.board.WIDTH * CELL, y * CELL)
 
-    def _draw_sections(self):
-        for sec in self.board.sections:
-            # polygon (new format)
-            if hasattr(sec, "points"):
-                pix = [(gx * CELL, gy * CELL) for gx, gy in sec.points]
-                self.create_polygon(
-                    *itertools.chain.from_iterable(pix),
-                    outline=getattr(sec, "outline", "#808080"),
-                    fill=getattr(sec, "fill", ""),
-                    stipple="gray25" if getattr(sec, "fill", "") else "",
-                    width=2, tags="sec")
-            # legacy rectangle (if any remain)
-            elif all(hasattr(sec, a) for a in ("x0", "y0", "x1", "y1")):
-                self.create_rectangle(sec.x0 * CELL, sec.y0 * CELL,
-                                      (sec.x1 + 1) * CELL, (sec.y1 + 1) * CELL,
-                                      outline=getattr(sec, "outline", "#808080"),
-                                      fill=getattr(sec, "fill", ""),
-                                      dash=(4, 2), width=2, tags="sec")
+    def _sections(self):
+        colour = {SectionType.CARD: "blue", SectionType.PIECE: "green",
+                  SectionType.TOKEN: "orange", SectionType.DECK: "purple",
+                  SectionType.ANY: "gray"}
+        for s in self.board.sections:
+            pts = [(gx * CELL, gy * CELL) for gx, gy in s.points]
+            self.create_polygon(
+                *itertools.chain.from_iterable(pts),
+                outline=colour[s.kind],
+                fill="",
+                dash=(4, 2),
+                width=2)
 
     # ================================================================ #
-    #  Stack & object rendering                                        #
+    #  Drawing helpers                                                 #
     # ================================================================ #
-    def _draw_stack(self, gx, gy, stack):
-        for i, obj in enumerate(stack):
-            self._draw_obj(gx * CELL + i * OFFSET,
-                           gy * CELL + i * OFFSET, obj)
+    def _draw_obj(self, gx: int, gy: int, obj, offset: int = 0):
+        x0, y0 = gx * CELL + offset, gy * CELL + offset
 
-    def _draw_obj(self, x0: int, y0: int, obj):
-        # --- deck pile ------------------------------------------------
         if isinstance(obj, Deck):
             self.create_rectangle(x0 + 8, y0 + 8, x0 + CELL - 8, y0 + CELL - 8,
                                   fill="plum", outline="black")
             self.create_text(x0 + CELL / 2, y0 + CELL / 2,
                              text=(obj.name or "Deck")[:8], fill="white")
             return
-        # --- prefer image --------------------------------------------
+
         if getattr(obj, "image_path", None):
             self.create_image(x0, y0, image=self._img(obj.image_path),
                               anchor="nw")
-        # --- polygon token/piece -------------------------------------
-        elif getattr(obj, "points", None):
+        elif getattr(obj, "points", None):           # polygon token/piece
             pts = [(x0 + px, y0 + py) for px, py in obj.points]
             self.create_polygon(
                 *itertools.chain.from_iterable(pts),
                 fill="khaki", outline="black")
-        # --- card silhouette -----------------------------------------
         elif isinstance(obj, Card):
             self._rounded(x0, y0)
-        # --- default token circle ------------------------------------
-        elif isinstance(obj, Token):
-            self.create_oval(x0 + 6, y0 + 6, x0 + CELL - 6, y0 + CELL - 6,
-                             fill="khaki", outline="black")
-        # --- fallback rectangle --------------------------------------
-        else:
+        else:  # generic
             self.create_rectangle(x0, y0, x0 + CELL, y0 + CELL,
-                                  fill="lightyellow")
-        # text label
-        self.create_text(x0 + CELL / 2, y0 + CELL / 2,
-                         text=obj.name[:6])
+                                  fill="lightyellow", outline="black")
+        self.create_text(x0 + CELL / 2, y0 + CELL / 2, text=obj.name[:6])
 
-    # --------------------------------------------------------------- #
     def _rounded(self, x: int, y: int):
         r = RADIUS
         pts = [x + r, y, x + CELL - r, y, x + CELL, y,
                x + CELL, y + r, x + CELL, y + CELL - r, x + CELL, y + CELL,
                x + CELL - r, y + CELL, x + r, y + CELL,
                x, y + CELL, x, y + CELL - r, x, y + r, x, y]
-        self.create_polygon(pts, smooth=True,
-                            fill="white", outline="black")
+        self.create_polygon(pts, smooth=True, fill="white", outline="black")
 
     def _img(self, name: str):
         if name not in self._cache:
-            im = Image.open(self.img_dir / name).resize(
-                (CELL, CELL),
-                Image.LANCZOS)
+            im = Image.open(self.img_dir / name).resize((CELL, CELL), Image.LANCZOS)
             self._cache[name] = ImageTk.PhotoImage(im)
         return self._cache[name]
 
     # ================================================================ #
-    #  Mouse & key interaction                                         #
+    #  Mouse handlers                                                  #
     # ================================================================ #
-    def _toggle_paint(self, _evt):
-        self.paint_anywhere = not self.paint_anywhere
-        self.master.title(
-            "PAINT-ANYWHERE ON"
-            if self.paint_anywhere else "")
-
-    # --------------- placement / drawing ---------------------------- #
     def _left(self, ev):
         gx, gy = ev.x // CELL, ev.y // CELL
+        tool = self.mode.get()
 
-        # polygon vertex capture
-        if self.mode == "poly":
-            self.poly_pts.append((gx, gy))
-            if len(self.poly_pts) >= 2:
-                self.create_line(self.poly_pts[-2][0] * CELL,
-                                 self.poly_pts[-2][1] * CELL,
-                                 self.poly_pts[-1][0] * CELL,
-                                 self.poly_pts[-1][1] * CELL,
-                                 fill="red")
+        if tool == "erase":
+            if self.board.remove_top(gx, gy):
+                self._redraw_all()
             return
 
-        # rectangle quick-section mode
-        if self.mode == "section":
-            self.sec_start = (gx, gy)
+        if tool == "move":
+            if self.board.grid[gy][gx].stack:
+                self.drag_src = (gx, gy)
             return
 
-        sel = getattr(self.winfo_toplevel(), "selected_obj", None)
-        if not sel:
-            return
+        if tool == "place":
+            sel = getattr(self.winfo_toplevel(), "selected_obj", None)
+            if not sel:
+                return
+            ok = self.board.place(gx, gy, sel.clone() if isinstance(sel, Deck) else sel)
+            if ok:
+                # clear selection after drop
+                self.winfo_toplevel().selected_obj = None
+                self._redraw_all()
 
-        # clone deck pile so original stays selectable
-        place_obj = sel.clone() if isinstance(sel, Deck) else sel
-
-        allowed = self.paint_anywhere or self.board.can_accept(gx, gy, place_obj)
-        if allowed and self.board.place(gx, gy, place_obj):
-            self._redraw_all()
-
-    # ---------------------------------------------------------------- #
     def _drag(self, ev):
-        if self.mode == "section" and self.sec_start:
-            self._redraw_all()
-            x0, y0 = self.sec_start
-            x1, y1 = ev.x // CELL, ev.y // CELL
-            self.create_rectangle(x0 * CELL, y0 * CELL,
-                                  (x1 + 1) * CELL, (y1 + 1) * CELL,
-                                  dash=(2, 2), outline="red")
-
-    # ---------------------------------------------------------------- #
-    def _release(self, ev):
-        # finish quick rectangle section
-        if self.mode == "section" and self.sec_start:
-            x0, y0 = self.sec_start
-            x1, y1 = ev.x // CELL, ev.y // CELL
-            x0, x1 = sorted((x0, x1))
-            y0, y1 = sorted((y0, y1))
-
-            pts = [(x0, y0), (x1 + 1, y0),
-                   (x1 + 1, y1 + 1), (x0, y1 + 1)]
-            name = simpledialog.askstring("Section name", "Name:",
-                                          parent=self.master) or "Area"
-            kind = simpledialog.askstring("Type",
-                                          "card/piece/token/deck/any:",
-                                          initialvalue="Any",
-                                          parent=self.master) or "Any"
-            outline = colorchooser.askcolor(title="Outline")[1] or "#808080"
-            fill = colorchooser.askcolor(title="Fill (cancel = none)")[1] or ""
-            self.board.add_section(name,
-                                   SectionType(kind.capitalize()),
-                                   pts, outline, fill)
-
-            self.sec_start = None
-            self.mode = "place"
-            self._redraw_all()
+        if self.mode.get() != "move" or not self.drag_src:
             return
+        gx1, gy1 = ev.x // CELL, ev.y // CELL
+        gx0, gy0 = self.drag_src
+        if (gx1, gy1) != (gx0, gy0):
+            obj = self.board.remove_top(gx0, gy0)
+            if obj and self.board.place(gx1, gy1, obj):
+                self.drag_src = (gx1, gy1)
+                self._redraw_all()
+
+    def _drop(self, _ev):
+        self.drag_src = None
 
     # ---------------------------------------------------------------- #
     def _right(self, ev):
         gx, gy = ev.x // CELL, ev.y // CELL
-
-        # section edit menu (Shift)
-        if ev.state & 0x0001:
-            sec = self._find_section(gx, gy)
-            if not sec:
-                return
-            choice = simpledialog.askstring(
-                "Section",
-                "delete / card / piece / token / deck / any",
-                initialvalue=sec.kind.value,
-                parent=self.master)
-            if not choice:
-                return
-            choice = choice.capitalize()
-            if choice == "Delete":
-                self.board.sections.remove(sec)
-            elif choice in ("Card", "Piece", "Token", "Deck", "Any"):
-                sec.kind = SectionType(choice)
-            sec.outline = colorchooser.askcolor(
-                title="Outline", initialcolor=sec.outline)[1] or sec.outline
-            fill_col = colorchooser.askcolor(
-                title="Fill (cancel keeps current)",
-                initialcolor=sec.fill or "#ffffff")[1]
-            if fill_col is not None:
-                sec.fill = fill_col
-            self._redraw_all()
-            return
-
-        # cell empty?
         cell = self.board.grid[gy][gx]
         if not cell.stack:
             return
         top = cell.stack[-1]
 
-        # deck special actions
+        # deck actions
         if isinstance(top, Deck):
-            if ev.state & 0x0004:          # Ctrl shuffle
-                top.shuffle(); self._redraw_all(); return
-            if ev.state & 0x0008:          # Alt reset
-                top.reset(); self._redraw_all(); return
+            menu = tk.Menu(self, tearoff=0)
+            menu.add_command(label="Draw",
+                             command=lambda d=top, x=gx, y=gy:
+                                        self._draw_card(d, x, y))
+            menu.add_separator()
+            menu.add_command(label="Shuffle",
+                             command=lambda d=top: (d.shuffle(),
+                                                    self._redraw_all()))
+            menu.add_command(label="Reset",
+                             command=lambda d=top: (d.reset(),
+                                                    self._redraw_all()))
+            menu.add_separator()
+            menu.add_command(label="Delete",
+                             command=lambda x=gx, y=gy:
+                                        (self.board.remove_top(x, y),
+                                         self._redraw_all()))
+            menu.tk_popup(ev.x_root, ev.y_root)
+            return
 
-        # normal pop / draw
-        popped = self.board.remove_top(gx, gy)
-        if isinstance(popped, Deck):
-            if popped.cards:
-                card = popped.draw()
-                messagebox.showinfo("Drew",
-                                    f"{card.name}\n\n{card.description}",
-                                    parent=self.master)
-                if popped.cards:
-                    self.board.place(gx, gy, popped)
+        # otherwise just pop
+        self.board.remove_top(gx, gy)
+        self._redraw_all()
+    
+    def _draw_card(self, deck: Deck, gx: int, gy: int):
+        if not deck.cards:
+            messagebox.showinfo("Deck empty",
+                                "This pile has no cards left.",
+                                parent=self.winfo_toplevel())
+            return
+        card = deck.draw()
+        top = self.winfo_toplevel()
+        messagebox.showinfo("Drew card",
+                            f"{card.name}\n\n{card.description}",
+                            parent=top)
+        self.winfo_toplevel().selected_obj = card      # cursor-preview & place
+        if deck.cards:
+            self.board.place(gx, gy, deck)
         self._redraw_all()
 
     # ================================================================ #
-    #  Polygon-drawing helpers                                         #
+    #  Mouse-move for preview cursor                                   #
     # ================================================================ #
-    def _start_poly(self, _evt):
-        self.mode = "poly"
-        self.poly_pts.clear()
-        self.winfo_toplevel().title("Polygon mode: click vertices, Enter=finish, Esc=cancel")
+    def _mouse_move(self, ev):
+        self.delete("cursor_preview")
+        sel = getattr(self.winfo_toplevel(), "selected_obj", None)
+        if sel:
+            self.create_image(ev.x, ev.y,
+                            image=self._preview_img(sel),
+                            anchor="center",
+                            tags="cursor_preview")
 
-    def _finish_poly(self, _evt):
-        if self.mode != "poly" or len(self.poly_pts) < 3:
+    def _preview(self, obj):
+        key = f"prev::{getattr(obj, 'image_path', obj.name)}"
+        if key in self._preview_cache:
+            return self._preview_cache[key]
+
+        if getattr(obj, "image_path", None):
+            im = Image.open(self.img_dir / obj.image_path)
+        else:
+            # make blank silhouette for non-image items
+            im = Image.new("RGBA", (CELL, CELL), "#aaaaaa88")
+        w, h = im.size
+        im = im.resize((int(w * PREVIEW_SCALE), int(h * PREVIEW_SCALE)),
+                       Image.LANCZOS)
+        self._preview_cache[key] = ImageTk.PhotoImage(im)
+        return self._preview_cache[key]
+
+    # ================================================================ #
+    #  External rectangle-section helper                               #
+    # ================================================================ #
+    def enter_section_mode(self):
+        self.mode.set("section")
+        self.sec_start = None
+        self.bind("<Button-1>", self._sec_start)
+        self.bind("<B1-Motion>", self._sec_drag)
+        self.bind("<ButtonRelease-1>", self._sec_release)
+
+    def _sec_start(self, ev):
+        self.sec_start = (ev.x // CELL, ev.y // CELL)
+
+    def _sec_drag(self, ev):
+        self._redraw_all()
+        if not self.sec_start:
             return
-        name = simpledialog.askstring("Section name", "Name:",
-                                      parent=self.master) or "Area"
-        kind = simpledialog.askstring("Type",
-                                      "card/piece/token/deck/any:",
-                                      initialvalue="Any",
-                                      parent=self.master) or "Any"
-        outline = colorchooser.askcolor(title="Outline")[1] or "#808080"
-        fill = colorchooser.askcolor(
-            title="Fill (cancel = none)")[1] or ""
+        x0, y0 = self.sec_start
+        x1, y1 = ev.x // CELL, ev.y // CELL
+        self.create_rectangle(x0 * CELL, y0 * CELL,
+                              (x1 + 1) * CELL, (y1 + 1) * CELL,
+                              dash=(2, 2), outline="red")
+
+    def _sec_release(self, ev):
+        if not self.sec_start:
+            return
+        gx0, gy0 = self.sec_start
+        gx1, gy1 = ev.x // CELL, ev.y // CELL
+        if (gx0, gy0) == (gx1, gy1):
+            self._reset_sec_binds()
+            return
+        pts = [(gx0, gy0), (gx1 + 1, gy0),
+               (gx1 + 1, gy1 + 1), (gx0, gy1 + 1)]
+        name = simpledialog.askstring("Section name", "Name:", parent=self.master) or "Area"
+        kind = simpledialog.askstring("Type", "card/piece/token/deck/any:",
+                                      initialvalue="Any", parent=self.master) or "Any"
         self.board.add_section(name,
                                SectionType(kind.capitalize()),
-                               self.poly_pts[:],
-                               outline, fill)
-        self.mode = "place"
-        self.poly_pts.clear()
+                               pts,
+                               "#808080", "")
+        self._reset_sec_binds()
         self._redraw_all()
-        self.master.title("")
 
-    def _cancel_poly(self, _evt):
-        if self.mode == "poly":
-            self.mode = "place"
-            self.poly_pts.clear()
-            self._redraw_all()
-            self.master.title("")
+    def _reset_sec_binds(self):
+        self.sec_start = None
+        self.unbind("<Button-1>"); self.unbind("<B1-Motion>"); self.unbind("<ButtonRelease-1>")
+        self.bind("<Button-1>", self._left)
+        self.bind("<B1-Motion>", self._drag)
+        self.bind("<ButtonRelease-1>", self._drop)
+        self.mode.set("place")
 
-    # ================================================================ #
-    #  Utilities                                                       #
-    # ================================================================ #
-    def _find_section(self, gx: int, gy: int):
-        for s in self.board.sections:
-            if hasattr(s, "points"):
-                if self.board._pnpoly(s.points, gx + .5, gy + .5):
-                    return s
-            elif all(hasattr(s, a) for a in ("x0", "y0", "x1", "y1")):
-                if s.x0 <= gx <= s.x1 and s.y0 <= gy <= s.y1:
-                    return s
+    def _preview_img(self, obj):
+        key = f"prev::{getattr(obj,'image_path', obj.name)}"
+        if key in self._preview_cache:
+            return self._preview_cache[key]
 
-    # called by sidebar when user wants quick rectangle
-    def enter_section_mode(self):
-        self.mode = "section"
+        if getattr(obj, "image_path", None):
+            im = Image.open(self.img_dir / obj.image_path)
+        else:
+            im = Image.new("RGBA", (CELL, CELL), "#aaaaaa88")
+
+        scl = 0.4
+        im = im.resize((int(CELL * scl), int(CELL * scl)), Image.LANCZOS)
+        self._preview_cache[key] = ImageTk.PhotoImage(im)
+        return self._preview_cache[key]

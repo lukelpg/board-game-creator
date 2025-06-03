@@ -153,32 +153,48 @@ def open_creator(games_dir: pathlib.Path,
 
     # ---------- save file --------------------------------------------- #
     def _save():
-        # sync board specs with current board_views
-        for view in board_views:
-            if isinstance(view, BoardView):
+        boards_out = []                     # collect all board specs
+
+        for idx, view in enumerate(board_views):
+            tab_title = board_notebook.tab(board_notebook.tabs()[idx], "text")
+
+            if isinstance(view, BoardView):             # ----- GRID board
                 bd = view.board
-                tab_title = board_notebook.tab(board_notebook.tabs()[idx], "text")
-                spec = BoardSpec(tab_title, bd.WIDTH, bd.HEIGHT, [
-                    dict(points=s.points,
-                        kind=s.kind.value,
-                        outline=getattr(s, "outline", "#808080"),
-                        fill=getattr(s, "fill", ""))
-                    for s in bd.sections
-                ])
-                boards.append(spec)              # store in list to save
-            else:   # FreeBoardView
+                boards_out.append({
+                    "name": tab_title,
+                    "width": bd.WIDTH,
+                    "height": bd.HEIGHT,
+                    "points_mode": "grid",
+                    "sections": [
+                        {
+                            "name":     getattr(sec, "name", tab_title),
+                            "kind":     sec.kind.value,
+                            "points":   sec.points,
+                            "outline":  getattr(sec, "outline", "#808080"),
+                            "fill":     getattr(sec, "fill", "")
+                        }
+                        for sec in bd.sections
+                    ]
+                })
+
+            else:                                       # ----- FREE board
                 fb = view.fb
-                boards.append(dict(               # store as raw dict
-                    name=view.master.cget("text"),
-                    mode="free",
-                    width=fb.width,
-                    height=fb.height,
-                    sections=fb.sections,
-                    placed=[dict(type=type(p.obj).__name__,
-                                name=p.obj.name,
-                                x=p.x, y=p.y)
-                            for p in fb.placed]
-                ))
+                boards_out.append({
+                    "mode":   "free",
+                    "name":   tab_title,
+                    "width":  fb.width,
+                    "height": fb.height,
+                    "sections": fb.sections,
+                    "placed":  [
+                        {
+                            "type": type(p.obj).__name__,
+                            "name": p.obj.name,
+                            "x":    p.x,
+                            "y":    p.y
+                        }
+                        for p in fb.placed
+                    ]
+                })
 
         gd.cards , gd.pieces, gd.tokens, gd.decks, gd.boards = \
             cards, pieces, tokens, decks, boards
