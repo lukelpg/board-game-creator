@@ -61,7 +61,7 @@ class GameData:
     pieces: List[Piece]
     tokens: List[Token]
     decks : List[Deck]
-    boards: List[BoardSpec]
+    boards: List[Any]
 
     # ---------- serialise --------------------------------------------- #
     def to_dict(self):
@@ -71,7 +71,10 @@ class GameData:
             "pieces": [p.to_dict() for p in self.pieces],
             "tokens": [t.to_dict() for t in self.tokens],
             "decks":  [d.to_dict() for d in self.decks ],
-            "boards": [b.to_dict() for b in self.boards],
+            "boards": [
+                (b.to_dict() if isinstance(b, BoardSpec) else b)
+                for b in self.boards
+            ],
         }
 
     # ---------- de-serialise (handles **old & new** formats) ----------- #
@@ -82,26 +85,45 @@ class GameData:
         from .token import Token
         from .deck  import Deck
 
-        cards  = [Card .from_dict(c) for c in d.get("cards", [])]
+        # Rebuild cards & lookup map
+        cards  = [Card.from_dict(c) for c in d.get("cards", [])]
         card_map = {c.name: c for c in cards}
 
         pieces = [Piece.from_dict(p) for p in d.get("pieces", [])]
         tokens = [Token.from_dict(t) for t in d.get("tokens", [])]
 
+        # Rebuild decks using names
         decks  = [Deck.from_dict(dd, card_map) for dd in d.get("decks", [])]
 
-        # ---- NEW format ------------------------------------------------
-        if "boards" in d:
-            boards = [BoardSpec.from_dict(b) for b in d["boards"]]
-            if not boards:           # safety – ensure at least one board
-                boards = [BoardSpec("Main", 8, 8, [])]
-            return cls(d["name"], cards, pieces, tokens, decks, boards)
+        # --- NEW format (grid + free boards mixed) -------------------
+        boards = []
+        for bd in d.get("boards", []):
+            # 1) Free‐board dict (mode:"free") → keep verbatim
+            if isinstance(bd, dict) and bd.get("mode") == "free":
+                boards.append(bd)
+                continue
 
-        # ---- OLD format fallback --------------------------------------
-        # old schema: 'board':{'w','h','sections'}
-        b = d.get("board") or {}
-        w = b.get("w", d.get("board_width" , 8))
-        h = b.get("h", d.get("board_height", 8))
-        secs = b.get("sections", [])
-        boards = [BoardSpec("Main", w, h, secs)]
+            # 2) Grid board, old style: {'name', 'w', 'h', 'sections'}
+            if isinstance(bd, dict) and "w" in bd and "h" in bd and "sections" in bd:
+                boards.append(BoardSpec(bd["name"], bd["w"], bd["h"], bd["sections"]))
+                continue
+
+            # 3) Grid board, new style: {'name', 'width', 'height', 'sections'}
+            if isinstance(bd, dict) and "width" in bd and "height" in bd and "sections" in bd:
+                boards.append(BoardSpec(bd["name"], bd["width"], bd["height"], bd["sections"]))
+                continue
+
+            # 4) Unexpected format, try BoardSpec.from_dict (legacy)
+            boards.append(BoardSpec.from_dict(bd))
+
+        # Safety default if nothing found
+        if not boards:
+            boards = [BoardSpec("Main", 8, 8, [])]
+
         return cls(d["name"], cards, pieces, tokens, decks, boards)
+
+
+
+
+
+

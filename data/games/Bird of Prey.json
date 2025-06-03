@@ -261,9 +261,10 @@
   ],
   "boards": [
     {
+      "mode": "grid",
       "name": "Main",
-      "w": 8,
-      "h": 8,
+      "width": 8,
+      "height": 8,
       "sections": [
         {
           "name": "Area",
@@ -340,9 +341,10 @@
       ]
     },
     {
+      "mode": "grid",
       "name": "Seasons",
-      "w": 4,
-      "h": 1,
+      "width": 4,
+      "height": 1,
       "sections": [
         {
           "name": "Area",
@@ -415,6 +417,52 @@
           ],
           "outline": "#808080",
           "fill": ""
+        }
+      ]
+    },
+    {
+      "mode": "free",
+      "name": "Beach",
+      "width": 800,
+      "height": 600,
+      "sections": [
+        {
+          "name": "Lake",
+          "kind": "Card",
+          "points": [
+            [
+              1,
+              5
+            ],
+            [
+              11,
+              5
+            ],
+            [
+              11,
+              8
+            ],
+            [
+              1,
+              8
+            ]
+          ],
+          "outline": "#0080c0",
+          "fill": "#0080ff"
+        }
+      ],
+      "placed": [
+        {
+          "type": "Deck",
+          "name": "Spring",
+          "x": 107,
+          "y": 345
+        },
+        {
+          "type": "Card",
+          "name": "Grass Land",
+          "x": 209,
+          "y": 345
         }
       ]
     }
