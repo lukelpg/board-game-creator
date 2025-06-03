@@ -31,6 +31,8 @@ class FreeBoardView(tk.Canvas):
         self.fb       = fb
         self.img_dir  = img_dir
         self._cache: Dict[str, ImageTk.PhotoImage] = {}
+        self._cache: Dict[str, ImageTk.PhotoImage] = {}
+        self._preview_cache: Dict[str, ImageTk.PhotoImage] = {} 
 
         # tool mode variable
         self.mode = tk.StringVar(value="place")   # Radiobuttons bind to this
@@ -46,6 +48,7 @@ class FreeBoardView(tk.Canvas):
         self.bind("<Button-3>",        self._popup)
 
         self.bind_all("<space>",       self._cycle_tool)
+        self.bind("<Motion>",          self._mouse_move)
 
         # polygon drawing state
         self.poly_pts: List[tuple[int, int]] = []
