@@ -145,6 +145,7 @@ class FreeBoardView(tk.Canvas):
                 return
             self.fb.add(sel.clone() if hasattr(sel, "clone") else sel, px, py)
             self._redraw()
+            self.winfo_toplevel().selected_obj = None      # ← clear after one drop
 
     def _move_drag(self, ev):
         if self.mode.get() != "move" or not self.drag:

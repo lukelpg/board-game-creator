@@ -233,7 +233,9 @@ class BoardView(tk.Canvas):
                             parent=top)
         self.winfo_toplevel().selected_obj = card      # cursor-preview & place
         if deck.cards:
-            self.board.place(gx, gy, deck)
+            cell = self.board.grid[gy][gx]
+            if deck not in cell.stack:       # avoid duplicate pile
+                self.board.place(gx, gy, deck)
         self._redraw_all()
 
     # ================================================================ #
