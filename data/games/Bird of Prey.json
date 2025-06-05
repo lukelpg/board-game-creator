@@ -417,6 +417,85 @@
           "y": 208
         }
       ]
+    },
+    {
+      "mode": "grid",
+      "name": "Test",
+      "width": 8,
+      "height": 8,
+      "sections": []
+    },
+    {
+      "mode": "free",
+      "name": "Test",
+      "width": 800,
+      "height": 600,
+      "sections": [],
+      "placed": []
+    },
+    {
+      "mode": "tilegrid",
+      "name": "Winter",
+      "shape": "hex",
+      "cols": 6,
+      "rows": 4,
+      "placed": [
+        {
+          "name": "Test",
+          "row": 0,
+          "col": 2
+        },
+        {
+          "name": "Test",
+          "row": 2,
+          "col": 1
+        },
+        {
+          "name": "Test",
+          "row": 3,
+          "col": 1
+        },
+        {
+          "name": "Test",
+          "row": 3,
+          "col": 2
+        }
+      ]
+    }
+  ],
+  "tiles": [
+    {
+      "name": "Test",
+      "shape": "hex",
+      "points": [
+        [
+          64.0,
+          32.0
+        ],
+        [
+          48.0,
+          59.712812921102035
+        ],
+        [
+          16.000000000000007,
+          59.71281292110204
+        ],
+        [
+          0.0,
+          32.00000000000001
+        ],
+        [
+          15.999999999999986,
+          4.2871870788979685
+        ],
+        [
+          48.0,
+          4.287187078897965
+        ]
+      ],
+      "outline": "#808080",
+      "fill": "#008000",
+      "image": null
     }
   ]
 }

@@ -7,6 +7,7 @@ from .piece import Piece
 from .token import Token
 from .deck  import Deck
 from .board import Board, SectionType
+from .tile import Tile
 
 
 # ---------- board spec ------------------------------------------------- #
@@ -86,6 +87,9 @@ class GameData:
     tokens: List[Token]
     decks : List[Deck]
     boards: List[Any]
+    tokens: List[Token]
+    tiles : List[Tile]          # ← add
+    decks : List[Deck]
 
     # ---------- serialise --------------------------------------------- #
     def to_dict(self):
@@ -99,6 +103,7 @@ class GameData:
                 (b.to_dict() if isinstance(b, BoardSpec) else b)
                 for b in self.boards
             ],
+            "tiles":  [t.to_dict() for t in self.tiles],
         }
 
     # ---------- de-serialise (handles **old & new** formats) ----------- #
@@ -118,6 +123,7 @@ class GameData:
 
         # Rebuild decks using names
         decks  = [Deck.from_dict(dd, card_map) for dd in d.get("decks", [])]
+        tiles = [Tile.from_dict(t) for t in d.get("tiles", [])]
 
         # --- NEW format (grid + free boards mixed) -------------------
         boards = []
@@ -144,7 +150,7 @@ class GameData:
         if not boards:
             boards = [BoardSpec("Main", 8, 8, [])]
 
-        return cls(d["name"], cards, pieces, tokens, decks, boards)
+        return cls(d["name"], cards, pieces, tokens, decks, boards, tiles)
 
 
 

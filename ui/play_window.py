@@ -5,6 +5,7 @@ from tkinter import ttk, messagebox
 from typing import List, Dict
 
 from game import Card, Piece, Token, Deck
+from game.tile         import Tile  
 from game.game_data   import BoardSpec
 from game.free_board  import FreeBoard
 from ui.board_view     import BoardView
@@ -25,6 +26,7 @@ def open_player(games_dir: pathlib.Path,
     pieces = {p["name"]: Piece.from_dict(p)  for p in raw.get("pieces", [])}
     tokens = {t["name"]: Token.from_dict(t)  for t in raw.get("tokens", [])}
     decks  = {d["name"]: Deck.from_dict(d, cards) for d in raw.get("decks", [])}
+    tiles = {t["name"]: Tile.from_dict(t) for t in raw.get("tiles", [])}
 
     # ---------- window shell ----------------------------------------- #
     root = tk.Toplevel()
@@ -45,11 +47,13 @@ def open_player(games_dir: pathlib.Path,
     _lbl("Pieces");  lbP = _lb(6)
     _lbl("Tokens");  lbT = _lb(6)
     _lbl("Decks");   lbD = _lb(6)
+    _lbl("Tiles"); lbTi = _lb(6)
 
     for name in cards:  lbC.insert("end", name)
     for name in pieces: lbP.insert("end", name)
     for name in tokens: lbT.insert("end", name)
     for name in decks:  lbD.insert("end", name)
+    for n in tiles: lbTi.insert("end", n)
 
     # ---------- board notebook --------------------------------------- #
     centre = ttk.Frame(root, padding=6)
@@ -81,6 +85,17 @@ def open_player(games_dir: pathlib.Path,
                     fb.add(obj, rec["x"], rec["y"])
             view = FreeBoardView(tab, fb, img_dir)
 
+        elif b.get("mode") == "tilegrid":
+            from ui.tile_grid_view import TileGridView
+            tg = TileGridView(tab, list(tiles.values()), b["cols"], b["rows"], img_dir)
+            # restore placed:
+            for rec in b.get("placed", []):
+                tile = tiles.get(rec["name"])
+                if tile:
+                    tg.place_tile(tile.clone(), rec["col"], rec["row"])
+            tg.pack()
+            nb_board.add(tab, text=b.get("name", "Tiles"))
+
         # ----- GRID board ------------------------------------------- #
         else:
             spec = BoardSpec.from_dict(b)
@@ -100,6 +115,7 @@ def open_player(games_dir: pathlib.Path,
     lbP.bind("<<ListboxSelect>>", lambda e: _sel(lbP, pieces))
     lbT.bind("<<ListboxSelect>>", lambda e: _sel(lbT, tokens))
     lbD.bind("<<ListboxSelect>>", lambda e: _sel(lbD, decks))
+    lbTi.bind("<<ListboxSelect>>", lambda e:_sel(lbTi, tiles))
 
     # ---------- quit ------------------------------------------------- #
     ttk.Button(side, text="Quit", command=root.destroy).pack(fill="x", pady=10)

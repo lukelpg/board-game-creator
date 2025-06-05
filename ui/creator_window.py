@@ -14,6 +14,11 @@ from .token_editor  import TokenEditor
 from .catalog_view  import CatalogViewer
 from .section_catalog import SectionCatalog
 
+from game.tile         import Tile
+from ui.tile_editor    import TileEditor
+from ui.tile_catalog   import TileCatalog
+from ui.tile_grid_view import TileGridView
+
 # ← ADD these imports for free‐board support:
 from game.free_board      import FreeBoard
 from ui.free_board_view   import FreeBoardView
@@ -37,6 +42,7 @@ def open_creator(games_dir: pathlib.Path,
     decks  : List[Deck]  = list(gd.decks)
     # gd.boards now contains a mix of BoardSpec *and* free‐board dicts
     boards : List[Any]   = list(gd.boards)   # ← type Any to hold both
+    tiles: list[Tile] = list(gd.tiles)
 
     # ---------- sidebar lists ----------------------------------------- #
     side = ttk.Frame(root, padding=6); side.grid(row=0, column=0, sticky="ns")
@@ -46,6 +52,7 @@ def open_creator(games_dir: pathlib.Path,
     _lbl("Pieces");  lbP = _lst()
     _lbl("Tokens");  lbT = _lst()
     _lbl("Decks");   lbD = _lst()
+    _lbl("Tiles");  lbTi = _lst()
 
     # ---------- board notebook ---------------------------------------- #
     board_notebook = ttk.Notebook(root)
@@ -77,6 +84,13 @@ def open_creator(games_dir: pathlib.Path,
             board_notebook.add(frm, text=bs.get("name", "Board"))
             board_views.append(view)
 
+        elif isinstance(bs, dict) and bs.get("mode") == "tilegrid":
+            grid = TileGridView(frm := ttk.Frame(board_notebook),
+                                tiles, bs["cols"], bs["rows"], img_dir)
+            grid.pack(fill="both", expand=True)
+            board_notebook.add(frm, text=bs.get("name", "Tiles"))
+            board_views.append(grid)
+
         else:
             # --- grid board case ---
             # bs is a BoardSpec
@@ -85,6 +99,8 @@ def open_creator(games_dir: pathlib.Path,
             view.pack(fill="both", expand=True)
             board_notebook.add(frm, text=bs.name)
             board_views.append(view)
+
+
 
     # Populate the tabs from gd.boards
     for bspec in boards:
@@ -95,6 +111,8 @@ def open_creator(games_dir: pathlib.Path,
     editors.add(CardEditor (editors, img_dir, lambda c:(cards.append(c), _refresh())), text="Card")
     editors.add(PieceEditor(editors, img_dir, lambda p:(pieces.append(p),_refresh())), text="Piece")
     editors.add(TokenEditor(editors, img_dir, lambda t:(tokens.append(t),_refresh())), text="Token")
+    editors.add(TileEditor(editors, img_dir, lambda t:(tiles.append(t), _refresh())),
+            text="Tile")
 
     # ---------- helpers ------------------------------------------------ #
     def _refresh():
@@ -102,6 +120,8 @@ def open_creator(games_dir: pathlib.Path,
         lbP.delete(0,"end"); [lbP.insert("end", p.name) for p in pieces]
         lbT.delete(0,"end"); [lbT.insert("end", t.name) for t in tokens]
         lbD.delete(0,"end"); [lbD.insert("end", d.name) for d in decks]
+        lbTi.delete(0, "end"); [lbTi.insert("end", t.name) for t in tiles]
+
 
     _refresh()
 
@@ -133,6 +153,9 @@ def open_creator(games_dir: pathlib.Path,
                 else _current_view()._redraw)
         )
     ).pack(fill="x", pady=(2,4))
+    ttk.Button(side, text="Tiles",
+           command=lambda: TileCatalog(root, tiles, _refresh))\
+    .pack(fill="x", pady=(2,4))
 
     ttk.Button(side, text="Save Game", command=lambda:_save())\
         .pack(fill="x", pady=(10,2))
@@ -161,6 +184,11 @@ def open_creator(games_dir: pathlib.Path,
         style = simpledialog.askstring("Style", "grid / free", initialvalue="free", parent=root)
         style = (style or "free").lower()
 
+        style = simpledialog.askstring(
+                    "Style", "grid / free / tilegrid",
+                    initialvalue="tilegrid", parent=root)
+        style = (style or "").lower()
+
         if style == "grid":
             w = simpledialog.askinteger("Columns", "Width:", minvalue=1, initialvalue=8, parent=root)
             h = simpledialog.askinteger("Rows",    "Height:",minvalue=1, initialvalue=8, parent=root)
@@ -169,7 +197,7 @@ def open_creator(games_dir: pathlib.Path,
             boards.append(spec)
             _add_board_tab(spec)
 
-        else:
+        elif style == "free":
             w = simpledialog.askinteger("Canvas W", "Width (px):",  minvalue=200, initialvalue=800, parent=root)
             h = simpledialog.askinteger("Canvas H", "Height (px):", minvalue=200, initialvalue=600, parent=root)
             if not (w and h): return
@@ -177,6 +205,20 @@ def open_creator(games_dir: pathlib.Path,
                        "sections": [], "placed": []}
             boards.append(fb_dict)
             _add_board_tab(fb_dict)
+        
+        elif style == "tilegrid":
+            shape = simpledialog.askstring("Tile shape", "rect / hex",
+                                        initialvalue="hex", parent=root)
+            cols = simpledialog.askinteger("Columns", "Cols:", minvalue=1,
+                                        initialvalue=6, parent=root)
+            rows = simpledialog.askinteger("Rows", "Rows:",  minvalue=1,
+                                        initialvalue=4, parent=root)
+            if shape and cols and rows:                         # ← guard
+                tg_dict = {"mode": "tilegrid", "name": bname,
+                        "shape": shape, "cols": cols, "rows": rows,
+                        "placed": []}
+                boards.append(tg_dict)
+                _add_board_tab(tg_dict)
 
     # ---------- save file --------------------------------------------- #
     def _save():
@@ -184,6 +226,7 @@ def open_creator(games_dir: pathlib.Path,
         for idx, view in enumerate(board_views):
             tab_title = board_notebook.tab(board_notebook.tabs()[idx], "text")
 
+            # ---------- GRID board (BoardView) ------------------------------ #
             if isinstance(view, BoardView):
                 bd = view.board
                 boards_out.append({
@@ -203,7 +246,8 @@ def open_creator(games_dir: pathlib.Path,
                     ]
                 })
 
-            else:   # FreeBoardView
+            # ---------- FREE canvas board (FreeBoardView) ------------------- #
+            elif hasattr(view, "fb"):
                 fb = view.fb
                 boards_out.append({
                     "mode":    "free",
@@ -222,9 +266,31 @@ def open_creator(games_dir: pathlib.Path,
                     ]
                 })
 
+            # ---------- TILE-grid board (TileGridView) ---------------------- #
+            elif isinstance(view, TileGridView):
+                tg = view
+                placed = []
+                for r in range(tg.rows):
+                    for c in range(tg.cols):
+                        t = tg.grid[r][c]
+                        if t:
+                            placed.append({"name": t.name, "row": r, "col": c})
+                boards_out.append({
+                    "mode":  "tilegrid",
+                    "name":  tab_title,
+                    "shape": tg.tileset[0].shape if tg.tileset else "hex",
+                    "cols":  tg.cols,
+                    "rows":  tg.rows,
+                    "placed": placed
+                })
+
+            else:
+                # fallback—shouldn't happen
+                continue
+
         # ← THIS line was already present; keep it exactly here:
-        gd.cards , gd.pieces, gd.tokens, gd.decks, gd.boards = \
-            cards, pieces, tokens, decks, boards_out
+        gd.cards , gd.pieces, gd.tokens, gd.tiles, gd.decks, gd.boards = \
+            cards, pieces, tokens, tiles, decks, boards_out
 
         path.write_text(json.dumps(gd.to_dict(), indent=2))
         messagebox.showinfo("Saved", "Game saved!")
@@ -238,5 +304,6 @@ def open_creator(games_dir: pathlib.Path,
     lbP.bind("<<ListboxSelect>>", lambda e:_sel(lbP, pieces))
     lbT.bind("<<ListboxSelect>>", lambda e:_sel(lbT, tokens))
     lbD.bind("<<ListboxSelect>>", lambda e:_sel(lbD, decks ))
+    lbTi.bind("<<ListboxSelect>>", lambda e:_sel(lbTi, tiles))
 
     root.transient(); root.grab_set(); root.wait_window()
