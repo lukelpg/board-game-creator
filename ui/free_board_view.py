@@ -1,10 +1,9 @@
 # ui/free_board_view.py
 from __future__ import annotations
 
-import itertools, pathlib, tkinter as tk
+import itertools, pathlib, tkinter as tk, json
 from tkinter import ttk, simpledialog, colorchooser, messagebox
 from typing import Dict, List
-
 from PIL import Image, ImageTk
 
 from game.free_board import FreeBoard, Placed
@@ -16,12 +15,12 @@ from game.token      import Token
 
 # --------------------------------------------------------- #
 CELL = 64               # sprite width/height in px
-OFFSET_SHADOW = 4       # not used (kept for future shadow offset)
-
+OFFSET_SHADOW = 4       # (reserved for future drop shadow)
 
 # --------------------------------------------------------- #
 class FreeBoardView(tk.Canvas):
-    """Free-placement canvas (no grid) with drag-to-move & context menu."""
+    """Free-placement canvas (no grid) with drag-move and context menu.
+       Sends {"act":"place", ...} JSON after every successful placement."""
 
     # ----------------------------------------------------- #
     def __init__(self, master, fb: FreeBoard, img_dir: pathlib.Path):
@@ -30,12 +29,13 @@ class FreeBoardView(tk.Canvas):
 
         self.fb       = fb
         self.img_dir  = img_dir
-        self._cache: Dict[str, ImageTk.PhotoImage] = {}
-        self._cache: Dict[str, ImageTk.PhotoImage] = {}
-        self._preview_cache: Dict[str, ImageTk.PhotoImage] = {} 
+        self.board_name = "Board"        # set to real name by play_window.py
 
-        # tool mode variable
-        self.mode = tk.StringVar(value="place")   # Radiobuttons bind to this
+        self._cache: Dict[str, ImageTk.PhotoImage] = {}
+        self._preview_cache: Dict[str, ImageTk.PhotoImage] = {}
+
+        # tool mode
+        self.mode = tk.StringVar(value="place")   # place / move / erase
 
         # drag state
         self.drag: Placed | None = None
@@ -46,23 +46,20 @@ class FreeBoardView(tk.Canvas):
         self.bind("<B1-Motion>",       self._move_drag)
         self.bind("<ButtonRelease-1>", self._drop)
         self.bind("<Button-3>",        self._popup)
-
         self.bind_all("<space>",       self._cycle_tool)
         self.bind("<Motion>",          self._mouse_move)
 
-        # polygon drawing state
+        # polygon-section state
         self.poly_pts: List[tuple[int, int]] = []
 
-        # UI
         self._build_tool_palette(master)
         self._redraw()
 
     # ===================================================== #
-    #  UI helpers                                            #
+    #  UI helpers                                           #
     # ===================================================== #
     def _build_tool_palette(self, master):
-        bar = ttk.Frame(master)
-        bar.pack(side="bottom", fill="x")
+        bar = ttk.Frame(master); bar.pack(side="bottom", fill="x")
         for txt in ("place", "move", "erase"):
             ttk.Radiobutton(bar, text=txt.capitalize(),
                             value=txt, variable=self.mode).pack(side="left")
@@ -79,35 +76,31 @@ class FreeBoardView(tk.Canvas):
     def _redraw(self):
         self.delete("all")
 
-        # draw sections
+        # draw sections (polygons in board units)
         for s in self.fb.sections:
             pts = [(x * CELL, y * CELL) for x, y in s["points"]]
-            self.create_polygon(
-                *itertools.chain.from_iterable(pts),
-                outline=s["outline"],
-                fill=s["fill"],
-                stipple="gray25" if s["fill"] else "",
-                width=2)
+            self.create_polygon(*itertools.chain.from_iterable(pts),
+                                outline=s["outline"],
+                                fill=s["fill"],
+                                stipple="gray25" if s["fill"] else "",
+                                width=2)
 
-        # draw objects
+        # draw placed objects
         for p in self.fb.placed:
             self._sprite(p)
 
     def _sprite(self, p: Placed):
-        obj = p.obj
-        x, y = p.x, p.y
-
+        obj, x, y = p.obj, p.x, p.y
         if getattr(obj, "image_path", None):
             self.create_image(x, y, image=self._img(obj.image_path), anchor="nw")
         elif getattr(obj, "points", None):
-            sc_pts = [(x + px, y + py) for px, py in obj.points]
-            self.create_polygon(
-                *itertools.chain.from_iterable(sc_pts),
-                fill="khaki", outline="black")
-        else:   # fallback card/rectangle
+            pts = [(x + px, y + py) for px, py in obj.points]
+            self.create_polygon(*itertools.chain.from_iterable(pts),
+                                fill="khaki", outline="black")
+        else:
             self.create_rectangle(x, y, x + CELL, y + CELL,
                                   fill="lightyellow", outline="black")
-            self.create_text(x + CELL / 2, y + CELL / 2, text=obj.name[:6])
+        self.create_text(x + CELL / 2, y + CELL / 2, text=obj.name[:6])
 
     def _img(self, path: str):
         if path not in self._cache:
@@ -116,21 +109,19 @@ class FreeBoardView(tk.Canvas):
         return self._cache[path]
 
     # ===================================================== #
-    #  Mouse interaction                                     #
+    #  Mouse interaction                                    #
     # ===================================================== #
     def _left(self, ev):
-        tool = self.mode.get()
-        px, py = ev.x, ev.y
+        tool, px, py = self.mode.get(), ev.x, ev.y
 
         # ---- erase --------------------------------------- #
         if tool == "erase":
             hits = self.fb.objects_at(px, py)
             if hits:
-                self.fb.remove(hits[-1])
-                self._redraw()
+                self.fb.remove(hits[-1]); self._redraw()
             return
 
-        # ---- move (select) --------------------------------#
+        # ---- move ---------------------------------------- #
         if tool == "move":
             hits = self.fb.objects_at(px, py)
             if hits:
@@ -138,14 +129,14 @@ class FreeBoardView(tk.Canvas):
                 self.dx, self.dy = px - self.drag.x, py - self.drag.y
             return
 
-        # ---- place ----------------------------------------#
+        # ---- place --------------------------------------- #
         if tool == "place":
             sel = getattr(self.winfo_toplevel(), "selected_obj", None)
             if not sel:
                 return
             self.fb.add(sel.clone() if hasattr(sel, "clone") else sel, px, py)
+            self._broadcast_place(sel, px, py)
             self._redraw()
-            self.winfo_toplevel().selected_obj = None      # ← clear after one drop
 
     def _move_drag(self, ev):
         if self.mode.get() != "move" or not self.drag:
@@ -161,36 +152,26 @@ class FreeBoardView(tk.Canvas):
         hits = self.fb.objects_at(ev.x, ev.y)
         if not hits:
             return
-        top_p = hits[-1]
-        obj   = top_p.obj
+        top_p, obj = hits[-1], hits[-1].obj
 
         menu = tk.Menu(self, tearoff=0)
         if isinstance(obj, Deck):
-            menu.add_command(label="Draw",
-                             command=lambda d=obj:
-                                        self._draw_card(d))
+            menu.add_command(label="Draw", command=lambda d=obj: self._draw_card(d))
             menu.add_separator()
-            menu.add_command(label="Shuffle",
-                             command=lambda d=obj: (d.shuffle(),
-                                                    self._redraw()))
-            menu.add_command(label="Reset",
-                             command=lambda d=obj: (d.reset(),
-                                                    self._redraw()))
+            menu.add_command(label="Shuffle", command=lambda d=obj: (d.shuffle(), self._redraw()))
+            menu.add_command(label="Reset",   command=lambda d=obj: (d.reset(),   self._redraw()))
             menu.add_separator()
-        menu.add_command(label="Delete",
-                         command=lambda p=top_p: (self.fb.remove(p),
-                                                  self._redraw()))
+        menu.add_command(label="Delete", command=lambda p=top_p: (self.fb.remove(p), self._redraw()))
         menu.tk_popup(ev.x_root, ev.y_root)
 
     def _draw_card(self, deck: Deck):
-        if not deck.cards: 
-            messagebox.showinfo("Deck empty",
-                                "This pile has no cards left.",
+        if not deck.cards:
+            messagebox.showinfo("Deck empty", "This pile has no cards left.",
                                 parent=self.winfo_toplevel())
             return
         c = deck.draw()
         messagebox.showinfo("Drew", f"{c.name}\n\n{c.description}", parent=self)
-        self.winfo_toplevel().selected_obj = c    # selected for placement
+        self.winfo_toplevel().selected_obj = c
         self._redraw()
 
     # ===================================================== #
@@ -276,6 +257,32 @@ class FreeBoardView(tk.Canvas):
         sel = getattr(self.winfo_toplevel(), "selected_obj", None)
         if sel:
             self.create_image(ev.x, ev.y,
-                            image=self._preview_img(sel),
-                            anchor="center",
-                            tags="cursor_preview")
+                              image=self._preview_img(sel),
+                              anchor="center", tags="cursor_preview")
+
+    # ------------------------ util ------------------------ #
+    def _preview_img(self, obj):
+        key = f"prev::{getattr(obj,'image_path', obj.name)}"
+        if key in self._preview_cache:
+            return self._preview_cache[key]
+        im = (Image.open(self.img_dir / obj.image_path)
+              if getattr(obj, "image_path", None)
+              else Image.new("RGBA", (CELL, CELL), "#aaaaaa88"))
+        im = im.resize((int(CELL * 0.4), int(CELL * 0.4)), Image.LANCZOS)
+        self._preview_cache[key] = ImageTk.PhotoImage(im)
+        return self._preview_cache[key]
+
+    # ===================================================== #
+    #  Multiplayer broadcast helper                         #
+    # ===================================================== #
+    def _broadcast_place(self, sel, x, y):
+        root  = self.winfo_toplevel()
+        out_q = getattr(root, "out_q", None)
+        if out_q:
+            out_q.put(json.dumps({
+                "act":   "place",
+                "board": self.board_name,
+                "name":  sel.name,
+                "x":     x,
+                "y":     y
+            }))

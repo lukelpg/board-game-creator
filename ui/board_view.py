@@ -1,12 +1,11 @@
 # ui/board_view.py
 from __future__ import annotations
 
-import itertools, pathlib, tkinter as tk
+import itertools, pathlib, tkinter as tk, json
 from tkinter import ttk, simpledialog, colorchooser, messagebox
 from typing import Dict, List, Tuple
 
 from PIL import Image, ImageTk
-
 from game.board  import Board, SectionType
 from game.card   import Card
 from game.piece  import Piece
@@ -19,15 +18,11 @@ OFFSET = 8
 RADIUS = 10
 PREVIEW_SCALE = 0.4                # cursor-preview sprite scale
 
-
 # -------------------------------------------------------------------- #
 class BoardView(tk.Canvas):
     """
     Grid canvas with stacks, drag-to-move, erase, deck draw → cursor.
-
-    • Radio palette bottom-left: Place / Move / Erase   (Space cycles)
-    • Right-click deck  → pop card + auto-select
-    • Selected object follows cursor as translucent preview
+    Multiplayer: broadcasts {"act":"place", ...} for every successful placement.
     """
 
     # ================================================================ #
@@ -38,6 +33,7 @@ class BoardView(tk.Canvas):
 
         self.board   = board
         self.img_dir = img_dir
+        self.board_name = "Board"        # overwritten by play_window.py
         self._cache: Dict[str, ImageTk.PhotoImage] = {}
         self._preview_cache: Dict[str, ImageTk.PhotoImage] = {}
 
@@ -53,7 +49,6 @@ class BoardView(tk.Canvas):
         self.bind("<B1-Motion>",       self._drag)
         self.bind("<ButtonRelease-1>", self._drop)
         self.bind("<Button-3>",        self._right)
-
         self.bind_all("<space>",       self._cycle_tool)
         self.bind("<Motion>",          self._mouse_move)
 
@@ -97,12 +92,9 @@ class BoardView(tk.Canvas):
                   SectionType.ANY: "gray"}
         for s in self.board.sections:
             pts = [(gx * CELL, gy * CELL) for gx, gy in s.points]
-            self.create_polygon(
-                *itertools.chain.from_iterable(pts),
-                outline=colour[s.kind],
-                fill="",
-                dash=(4, 2),
-                width=2)
+            self.create_polygon(*itertools.chain.from_iterable(pts),
+                                outline=colour[s.kind], fill="",
+                                dash=(4, 2), width=2)
 
     # ================================================================ #
     #  Drawing helpers                                                 #
@@ -122,12 +114,11 @@ class BoardView(tk.Canvas):
                               anchor="nw")
         elif getattr(obj, "points", None):           # polygon token/piece
             pts = [(x0 + px, y0 + py) for px, py in obj.points]
-            self.create_polygon(
-                *itertools.chain.from_iterable(pts),
-                fill="khaki", outline="black")
+            self.create_polygon(*itertools.chain.from_iterable(pts),
+                                fill="khaki", outline="black")
         elif isinstance(obj, Card):
             self._rounded(x0, y0)
-        else:  # generic
+        else:
             self.create_rectangle(x0, y0, x0 + CELL, y0 + CELL,
                                   fill="lightyellow", outline="black")
         self.create_text(x0 + CELL / 2, y0 + CELL / 2, text=obj.name[:6])
@@ -145,12 +136,18 @@ class BoardView(tk.Canvas):
             im = Image.open(self.img_dir / name).resize((CELL, CELL), Image.LANCZOS)
             self._cache[name] = ImageTk.PhotoImage(im)
         return self._cache[name]
+    
+    def _in_bounds(self, gx: int, gy: int) -> bool:
+        """True if grid coordinates are inside the board."""
+        return 0 <= gx < self.board.WIDTH and 0 <= gy < self.board.HEIGHT
 
     # ================================================================ #
     #  Mouse handlers                                                  #
     # ================================================================ #
     def _left(self, ev):
         gx, gy = ev.x // CELL, ev.y // CELL
+        if not self._in_bounds(gx, gy):
+            return
         tool = self.mode.get()
 
         if tool == "erase":
@@ -167,16 +164,19 @@ class BoardView(tk.Canvas):
             sel = getattr(self.winfo_toplevel(), "selected_obj", None)
             if not sel:
                 return
-            ok = self.board.place(gx, gy, sel.clone() if isinstance(sel, Deck) else sel)
-            if ok:
-                # clear selection after drop
-                self.winfo_toplevel().selected_obj = None
+            placed = self.board.place(gx, gy,
+                                       sel.clone() if isinstance(sel, Deck) else sel)
+            if placed:
                 self._redraw_all()
+                # ── broadcast placement ──────────────────────────── #
+                self._broadcast_place(sel, gx, gy)
 
     def _drag(self, ev):
         if self.mode.get() != "move" or not self.drag_src:
             return
         gx1, gy1 = ev.x // CELL, ev.y // CELL
+        if not self._in_bounds(gx1, gy1):
+            return
         gx0, gy0 = self.drag_src
         if (gx1, gy1) != (gx0, gy0):
             obj = self.board.remove_top(gx0, gy0)
@@ -188,14 +188,28 @@ class BoardView(tk.Canvas):
         self.drag_src = None
 
     # ---------------------------------------------------------------- #
+    def _broadcast_place(self, sel, gx, gy):
+        root  = self.winfo_toplevel()
+        out_q = getattr(root, "out_q", None)
+        if out_q:
+            out_q.put(json.dumps({
+                "act":   "place",
+                "board": self.board_name,
+                "name":  sel.name,
+                "x":     gx,
+                "y":     gy
+            }))
+
+    # ---------------- remainder (deck pop, preview, sections) ------- #
     def _right(self, ev):
         gx, gy = ev.x // CELL, ev.y // CELL
+        if not self._in_bounds(gx, gy):
+            return
         cell = self.board.grid[gy][gx]
         if not cell.stack:
             return
         top = cell.stack[-1]
 
-        # deck actions
         if isinstance(top, Deck):
             menu = tk.Menu(self, tearoff=0)
             menu.add_command(label="Draw",
@@ -203,22 +217,17 @@ class BoardView(tk.Canvas):
                                         self._draw_card(d, x, y))
             menu.add_separator()
             menu.add_command(label="Shuffle",
-                             command=lambda d=top: (d.shuffle(),
-                                                    self._redraw_all()))
+                             command=lambda d=top: (d.shuffle(), self._redraw_all()))
             menu.add_command(label="Reset",
-                             command=lambda d=top: (d.reset(),
-                                                    self._redraw_all()))
+                             command=lambda d=top: (d.reset(),   self._redraw_all()))
             menu.add_separator()
             menu.add_command(label="Delete",
                              command=lambda x=gx, y=gy:
-                                        (self.board.remove_top(x, y),
-                                         self._redraw_all()))
+                                        (self.board.remove_top(x, y), self._redraw_all()))
             menu.tk_popup(ev.x_root, ev.y_root)
             return
 
-        # otherwise just pop
-        self.board.remove_top(gx, gy)
-        self._redraw_all()
+        self.board.remove_top(gx, gy); self._redraw_all()
     
     def _draw_card(self, deck: Deck, gx: int, gy: int):
         if not deck.cards:
