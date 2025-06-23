@@ -11,6 +11,7 @@ from game.card   import Card
 from game.piece  import Piece
 from game.token  import Token
 from game.deck   import Deck
+from ui.view.zoom import ZoomMixin           # ← fixed import
 
 # -------------------------------------------------------------------- #
 CELL   = 64
@@ -19,7 +20,7 @@ RADIUS = 10
 PREVIEW_SCALE = 0.4                # cursor-preview sprite scale
 
 # -------------------------------------------------------------------- #
-class BoardView(tk.Canvas):
+class BoardView(ZoomMixin, tk.Canvas):        # ← inherit mix-in first
     """
     Grid canvas with stacks, drag-to-move, erase, deck draw → cursor.
     Multiplayer: broadcasts {"act":"place", ...} for every successful placement.
@@ -33,6 +34,7 @@ class BoardView(tk.Canvas):
 
         self.board   = board
         self.img_dir = img_dir
+        self._bind_zoom()                # now resolves via ZoomMixin
         self.board_name = "Board"        # overwritten by play_window.py
         self._cache: Dict[str, ImageTk.PhotoImage] = {}
         self._preview_cache: Dict[str, ImageTk.PhotoImage] = {}
@@ -367,3 +369,15 @@ class BoardView(tk.Canvas):
         im = im.resize((int(CELL * scl), int(CELL * scl)), Image.LANCZOS)
         self._preview_cache[key] = ImageTk.PhotoImage(im)
         return self._preview_cache[key]
+    
+    def _zoom_changed(self, scale):
+        global CELL
+        CELL = int(64 * scale)
+        self._redraw_all()
+
+    def _zoom_changed(self, scale):
+        global CELL
+        CELL = int(64 * scale)
+        self.config(width=self.board.WIDTH*CELL,
+                    height=self.board.HEIGHT*CELL)
+        self._redraw_all()

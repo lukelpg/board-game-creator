@@ -9,7 +9,7 @@ from ui.play_window    import open_player
 def launch_selector(games_dir: pathlib.Path, images_dir: pathlib.Path):
     root = tk.Tk(); root.title("Select a Game")
 
-    lb = tk.Listbox(root, width=30, height=12); lb.pack(padx=10, pady=10)
+    lb = tk.Listbox(root, width=200, height=12); lb.pack(padx=10, pady=10)
 
     def refresh():
         lb.delete(0, "end")
@@ -51,6 +51,6 @@ def launch_selector(games_dir: pathlib.Path, images_dir: pathlib.Path):
     ttk.Button(root, text="Edit (Creator Mode)", command=_edit)\
         .pack(fill="x", padx=10, pady=4)
     ttk.Button(root, text="Play-test", command=_play)\
-        .pack(fill="x", padx=10)
+        .pack(fill="x", padx=10, pady=10)
 
     root.mainloop()

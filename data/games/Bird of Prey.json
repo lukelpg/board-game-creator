@@ -325,140 +325,36 @@
       ]
     },
     {
-      "mode": "free",
-      "name": "Beach",
-      "width": 800,
-      "height": 600,
-      "sections": [
-        {
-          "name": "Lake",
-          "kind": "Card",
-          "points": [
-            [
-              1,
-              5
-            ],
-            [
-              11,
-              5
-            ],
-            [
-              11,
-              8
-            ],
-            [
-              1,
-              8
-            ]
-          ],
-          "outline": "#0080c0",
-          "fill": "#0080ff"
-        },
-        {
-          "name": "Test",
-          "kind": "Any",
-          "points": [
-            [
-              6,
-              1
-            ],
-            [
-              9,
-              1
-            ],
-            [
-              9,
-              3
-            ],
-            [
-              6,
-              3
-            ]
-          ],
-          "outline": "#8080ff",
-          "fill": "#8080ff"
-        },
-        {
-          "name": "Cards",
-          "kind": "Any",
-          "points": [
-            [
-              2,
-              0
-            ],
-            [
-              3,
-              0
-            ],
-            [
-              3,
-              2
-            ],
-            [
-              2,
-              2
-            ]
-          ],
-          "outline": "#00ff40",
-          "fill": "#ffff00"
-        }
-      ],
-      "placed": [
-        {
-          "type": "Deck",
-          "name": "Spring",
-          "x": 123,
-          "y": 214
-        },
-        {
-          "type": "Card",
-          "name": "Grass Land",
-          "x": 260,
-          "y": 208
-        }
-      ]
-    },
-    {
-      "mode": "grid",
-      "name": "Test",
-      "width": 8,
-      "height": 8,
-      "sections": []
-    },
-    {
-      "mode": "free",
-      "name": "Test",
-      "width": 800,
-      "height": 600,
-      "sections": [],
-      "placed": []
-    },
-    {
       "mode": "tilegrid",
-      "name": "Winter",
+      "name": "Hex Board",
       "shape": "hex",
       "cols": 6,
       "rows": 4,
       "placed": [
         {
           "name": "Test",
-          "row": 0,
-          "col": 2
+          "row": 2,
+          "col": 3
         },
         {
           "name": "Test",
           "row": 2,
-          "col": 1
+          "col": 5
         },
         {
           "name": "Test",
           "row": 3,
-          "col": 1
+          "col": 3
         },
         {
           "name": "Test",
           "row": 3,
-          "col": 2
+          "col": 4
+        },
+        {
+          "name": "Test",
+          "row": 3,
+          "col": 5
         }
       ]
     }
@@ -496,6 +392,39 @@
       "outline": "#808080",
       "fill": "#008000",
       "image": null
+    },
+    {
+      "name": "Land",
+      "shape": "hex",
+      "points": [
+        [
+          64.0,
+          32.0
+        ],
+        [
+          48.0,
+          59.712812921102035
+        ],
+        [
+          16.000000000000007,
+          59.71281292110204
+        ],
+        [
+          0.0,
+          32.00000000000001
+        ],
+        [
+          15.999999999999986,
+          4.2871870788979685
+        ],
+        [
+          48.0,
+          4.287187078897965
+        ]
+      ],
+      "outline": "#808080",
+      "fill": "#cccccc",
+      "image": "diverse_hex.png"
     }
   ]
 }
