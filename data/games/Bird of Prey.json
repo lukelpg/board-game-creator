@@ -326,7 +326,7 @@
     },
     {
       "mode": "tilegrid",
-      "name": "Hex Board",
+      "name": "Test Hex",
       "shape": "hex",
       "cols": 6,
       "rows": 4,
@@ -338,23 +338,8 @@
         },
         {
           "name": "Test",
-          "row": 2,
-          "col": 5
-        },
-        {
-          "name": "Test",
           "row": 3,
-          "col": 3
-        },
-        {
-          "name": "Test",
-          "row": 3,
-          "col": 4
-        },
-        {
-          "name": "Test",
-          "row": 3,
-          "col": 5
+          "col": 2
         }
       ]
     }
